@@ -73,18 +73,23 @@ async def register(
     db.add(user)
     db.flush()
 
-    from src.filter import DEFAULT_INTERESTS, INTEREST_TABLE, HIGH_SIGNAL_KEYWORDS, LOW_SIGNAL_KEYWORDS, NOTABLE_AUTHORS
     from src.scraper import DEFAULT_CATEGORIES
-    from src.filter import DEFAULT_ARXIV_KEYWORDS
+    from src.filter import HIGH_SIGNAL_KEYWORDS, NOTABLE_AUTHORS
+
+    _DEFAULT_INTEREST_TABLE = [
+        {"name": "LLM", "description": "Large language model training, alignment, RLHF, reasoning, scaling, and inference optimization."},
+        {"name": "Agent", "description": "LLM-based agents, tool use, multi-agent systems, agentic workflows, and test-time compute scaling."},
+    ]
+    _DEFAULT_KEYWORDS = ["LLM", "Agent", "Reinforcement Learning"]
 
     config = UserConfig(
         user_id=user.id,
-        keywords_json=json.dumps(DEFAULT_ARXIV_KEYWORDS, ensure_ascii=False),
+        keywords_json=json.dumps(_DEFAULT_KEYWORDS, ensure_ascii=False),
         categories_json=json.dumps(DEFAULT_CATEGORIES, ensure_ascii=False),
-        interests_text=DEFAULT_INTERESTS,
-        interest_table_json=json.dumps(INTEREST_TABLE, ensure_ascii=False),
+        interests_text="",
+        interest_table_json=json.dumps(_DEFAULT_INTEREST_TABLE, ensure_ascii=False),
         high_signal_keywords_json=json.dumps(HIGH_SIGNAL_KEYWORDS, ensure_ascii=False),
-        low_signal_keywords_json=json.dumps(LOW_SIGNAL_KEYWORDS, ensure_ascii=False),
+        low_signal_keywords_json=json.dumps([], ensure_ascii=False),
         notable_authors_json=json.dumps(list(NOTABLE_AUTHORS), ensure_ascii=False),
     )
     db.add(config)

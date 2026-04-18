@@ -145,10 +145,19 @@ async def rate_papers_for_user(
 
         # 读取用户配置
         cfg = db.query(UserConfig).filter(UserConfig.user_id == user_id).first()
-        interests_text = cfg.interests_text if cfg else filter_mod.DEFAULT_INTERESTS
+        # Build interests_text from interest_table ({name, description} format)
+        interests_text = filter_mod.DEFAULT_INTERESTS
+        if cfg:
+            items = json.loads(cfg.interest_table_json or "[]")
+            if items and isinstance(items[0], dict) and "name" in items[0]:
+                interests_text = "\n".join(
+                    f"- {it['name']}: {it.get('description', '')}" for it in items
+                )
+            elif cfg.interests_text:
+                interests_text = cfg.interests_text
         notable_authors = set(json.loads(cfg.notable_authors_json or "[]")) if cfg else filter_mod.NOTABLE_AUTHORS
         high_signal = json.loads(cfg.high_signal_keywords_json or "[]") if cfg else filter_mod.HIGH_SIGNAL_KEYWORDS
-        low_signal = json.loads(cfg.low_signal_keywords_json or "[]") if cfg else filter_mod.LOW_SIGNAL_KEYWORDS
+        low_signal = []  # low signal keywords removed from UI
         hp_target = cfg.high_priority_target if cfg else 15
 
         # 临时注入用户配置（asyncio 单线程安全）

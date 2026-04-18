@@ -68,8 +68,6 @@ async def update_config(request: Request, db: Session = Depends(get_db)):
         cfg.interest_table_json = json.dumps(body["interest_table"], ensure_ascii=False)
     if "high_signal_keywords" in body:
         cfg.high_signal_keywords_json = json.dumps(body["high_signal_keywords"], ensure_ascii=False)
-    if "low_signal_keywords" in body:
-        cfg.low_signal_keywords_json = json.dumps(body["low_signal_keywords"], ensure_ascii=False)
     if "notable_authors" in body:
         cfg.notable_authors_json = json.dumps(body["notable_authors"], ensure_ascii=False)
     if "llm_api_key" in body:
@@ -95,21 +93,29 @@ async def get_defaults(request: Request, db: Session = Depends(get_db)):
     src_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))), "src")
     if src_dir not in sys.path:
         sys.path.insert(0, src_dir)
-    from src.filter import DEFAULT_INTERESTS, INTEREST_TABLE, HIGH_SIGNAL_KEYWORDS, LOW_SIGNAL_KEYWORDS, NOTABLE_AUTHORS
+    from src.filter import INTEREST_TABLE, HIGH_SIGNAL_KEYWORDS, NOTABLE_AUTHORS, DEFAULT_ARXIV_KEYWORDS
     from src.scraper import DEFAULT_CATEGORIES
-    from src.filter import DEFAULT_ARXIV_KEYWORDS
 
     return {
         "keywords": DEFAULT_ARXIV_KEYWORDS,
         "categories": DEFAULT_CATEGORIES,
-        "interests_text": DEFAULT_INTERESTS,
-        "interest_table": INTEREST_TABLE,
+        "interest_table": [{"name": it.get("field", ""), "description": it.get("description", "")} for it in INTEREST_TABLE],
         "high_signal_keywords": HIGH_SIGNAL_KEYWORDS,
-        "low_signal_keywords": LOW_SIGNAL_KEYWORDS,
         "notable_authors": sorted(NOTABLE_AUTHORS),
         "max_results": 800,
         "high_priority_target": 15,
     }
+
+
+def _normalize_interest_table(raw: list) -> list:
+    """Normalize interest_table to [{name, description}] format."""
+    result = []
+    for it in raw:
+        if "name" in it:
+            result.append({"name": it["name"], "description": it.get("description", "")})
+        elif "field" in it:
+            result.append({"name": it["field"], "description": it.get("description", "")})
+    return result
 
 
 def _serialize_config(cfg: UserConfig | None) -> dict:
@@ -117,10 +123,8 @@ def _serialize_config(cfg: UserConfig | None) -> dict:
         return {
             "keywords": [],
             "categories": [],
-            "interests_text": "",
             "interest_table": [],
             "high_signal_keywords": [],
-            "low_signal_keywords": [],
             "notable_authors": [],
             "llm_api_key": "",
             "llm_endpoint": "",
@@ -131,10 +135,8 @@ def _serialize_config(cfg: UserConfig | None) -> dict:
     return {
         "keywords": json.loads(cfg.keywords_json or "[]"),
         "categories": json.loads(cfg.categories_json or "[]"),
-        "interests_text": cfg.interests_text or "",
-        "interest_table": json.loads(cfg.interest_table_json or "[]"),
+        "interest_table": _normalize_interest_table(json.loads(cfg.interest_table_json or "[]")),
         "high_signal_keywords": json.loads(cfg.high_signal_keywords_json or "[]"),
-        "low_signal_keywords": json.loads(cfg.low_signal_keywords_json or "[]"),
         "notable_authors": json.loads(cfg.notable_authors_json or "[]"),
         "llm_api_key": cfg.llm_api_key or "",
         "llm_endpoint": cfg.llm_endpoint or "",

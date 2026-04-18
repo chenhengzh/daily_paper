@@ -17,9 +17,18 @@
 
     <!-- 研究兴趣（最重要） -->
     <section class="config-section">
-      <h3>研究兴趣描述</h3>
-      <p class="section-desc">用自然语言描述你的研究方向，LLM 会据此对论文打分和筛选。</p>
-      <textarea id="interests_text" rows="10">{{ config.interests_text }}</textarea>
+      <h3>研究兴趣</h3>
+      <p class="section-desc">每个条目代表一个研究方向，LLM 会据此对论文打分和分类。</p>
+      <div id="interestItems" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+        {% for item in config.interest_table %}
+        <div class="interest-item" style="display:flex;gap:8px;align-items:center">
+          <input type="text" class="ii-name" value="{{ item.name if item.name is defined else item.field }}" placeholder="方向名称" style="width:160px;flex-shrink:0">
+          <input type="text" class="ii-desc" value="{{ item.description }}" placeholder="描述这个研究方向的关注点...">
+          <button type="button" class="btn-icon btn-del" onclick="delInterestItem(this)">✕</button>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="addInterestItem()">+ 添加方向</button>
     </section>
 
     <!-- arXiv 搜索 -->
@@ -47,40 +56,17 @@
       <div class="advanced-inner">
 
         <section style="margin-bottom:20px">
-          <h3 style="font-size:13px;margin-bottom:10px">信号关键词</h3>
+          <h3 style="font-size:13px;margin-bottom:10px">信号关键词与作者</h3>
           <div class="form-grid">
             <div class="form-group">
               <label>高信号关键词（每行一个，命中加分）</label>
               <textarea id="high_signal_keywords" rows="8">{{ config.high_signal_keywords | join('\n') }}</textarea>
             </div>
             <div class="form-group">
-              <label>低信号关键词（每行一个，命中降权）</label>
-              <textarea id="low_signal_keywords" rows="8">{{ config.low_signal_keywords | join('\n') }}</textarea>
-            </div>
-            <div class="form-group">
               <label>重点关注作者（每行一个全名）</label>
               <textarea id="notable_authors" rows="8">{{ config.notable_authors | join('\n') }}</textarea>
             </div>
           </div>
-        </section>
-
-        <section style="margin-bottom:20px">
-          <h3 style="font-size:13px;margin-bottom:10px">研究兴趣分类表</h3>
-          <p class="section-desc">LLM 会将论文归类到这里的 field/subfield，用于左侧筛选。</p>
-          <table class="interest-table" id="interestTable">
-            <thead><tr><th>Field</th><th>Subfield</th><th>Description</th><th></th></tr></thead>
-            <tbody id="interestTableBody">
-              {% for row in config.interest_table %}
-              <tr>
-                <td><input type="text" class="it-field" value="{{ row.field }}"></td>
-                <td><input type="text" class="it-subfield" value="{{ row.subfield }}"></td>
-                <td><input type="text" class="it-desc" value="{{ row.description }}"></td>
-                <td><button type="button" class="btn-icon btn-del" onclick="delRow(this)">✕</button></td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="addRow()">+ 添加行</button>
         </section>
 
         <section>
@@ -118,40 +104,38 @@ function getLines(id) {
   return document.getElementById(id).value.split('\n').map(s => s.trim()).filter(Boolean);
 }
 
-function getInterestTable() {
-  const rows = document.querySelectorAll('#interestTableBody tr');
+function getInterestItems() {
+  const items = document.querySelectorAll('#interestItems .interest-item');
   const result = [];
-  for (const row of rows) {
-    const field = row.querySelector('.it-field').value.trim();
-    const subfield = row.querySelector('.it-subfield').value.trim();
-    const desc = row.querySelector('.it-desc').value.trim();
-    if (field && subfield) result.push({field, subfield, description: desc});
+  for (const item of items) {
+    const name = item.querySelector('.ii-name').value.trim();
+    const desc = item.querySelector('.ii-desc').value.trim();
+    if (name) result.push({name, description: desc});
   }
   return result;
 }
 
-function addRow() {
-  const tbody = document.getElementById('interestTableBody');
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td><input type="text" class="it-field" placeholder="RL"></td>
-    <td><input type="text" class="it-subfield" placeholder="RLHF"></td>
-    <td><input type="text" class="it-desc" placeholder="描述"></td>
-    <td><button type="button" class="btn-icon btn-del" onclick="delRow(this)">✕</button></td>`;
-  tbody.appendChild(tr);
-  tr.querySelector('.it-field').focus();
+function addInterestItem(name='', desc='') {
+  const container = document.getElementById('interestItems');
+  const div = document.createElement('div');
+  div.className = 'interest-item';
+  div.style.cssText = 'display:flex;gap:8px;align-items:center';
+  div.innerHTML = `
+    <input type="text" class="ii-name" value="${esc(name)}" placeholder="方向名称" style="width:160px;flex-shrink:0">
+    <input type="text" class="ii-desc" value="${esc(desc)}" placeholder="描述这个研究方向的关注点...">
+    <button type="button" class="btn-icon btn-del" onclick="delInterestItem(this)">✕</button>`;
+  container.appendChild(div);
+  div.querySelector('.ii-name').focus();
 }
 
-function delRow(btn) { btn.closest('tr').remove(); }
+function delInterestItem(btn) { btn.closest('.interest-item').remove(); }
 
 async function saveConfig() {
   const payload = {
     keywords: getLines('keywords'),
     categories: getLines('categories'),
-    interests_text: document.getElementById('interests_text').value,
-    interest_table: getInterestTable(),
+    interest_table: getInterestItems(),
     high_signal_keywords: getLines('high_signal_keywords'),
-    low_signal_keywords: getLines('low_signal_keywords'),
     notable_authors: getLines('notable_authors'),
     llm_api_key: document.getElementById('llm_api_key').value.trim() || null,
     llm_endpoint: document.getElementById('llm_endpoint').value.trim() || null,
@@ -175,21 +159,15 @@ async function resetToDefaults() {
     const d = await res.json();
     document.getElementById('keywords').value = (d.keywords || []).join('\n');
     document.getElementById('categories').value = (d.categories || []).join('\n');
-    document.getElementById('interests_text').value = d.interests_text || '';
     document.getElementById('high_signal_keywords').value = (d.high_signal_keywords || []).join('\n');
-    document.getElementById('low_signal_keywords').value = (d.low_signal_keywords || []).join('\n');
     document.getElementById('notable_authors').value = (d.notable_authors || []).join('\n');
     document.getElementById('max_results').value = d.max_results || 800;
     document.getElementById('high_priority_target').value = d.high_priority_target || 15;
-    const tbody = document.getElementById('interestTableBody');
-    tbody.innerHTML = '';
-    for (const row of (d.interest_table || [])) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td><input type="text" class="it-field" value="${esc(row.field)}"></td>
-        <td><input type="text" class="it-subfield" value="${esc(row.subfield)}"></td>
-        <td><input type="text" class="it-desc" value="${esc(row.description)}"></td>
-        <td><button type="button" class="btn-icon btn-del" onclick="delRow(this)">✕</button></td>`;
-      tbody.appendChild(tr);
+    const container = document.getElementById('interestItems');
+    container.innerHTML = '';
+    for (const item of (d.interest_table || [])) {
+      const name = item.name || item.field || '';
+      addInterestItem(name, item.description || '');
     }
     showMsg('已重置，请点击保存。', 'info');
   } catch(e) { showMsg('重置失败：' + e.message, 'error'); }

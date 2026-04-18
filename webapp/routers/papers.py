@@ -230,49 +230,52 @@ async def trigger_job(
     import threading
     import asyncio
     import logging
+    from datetime import timedelta
     from webapp.services.pipeline import scrape_and_store, rate_papers_for_user
 
     user = _current_user_dep(request, db)
     body = await request.json()
-    date_str = body.get("date")
     force = bool(body.get("force", False))
-    target_date = _parse_date(date_str)
     user_id = user.id
 
     def _run_in_thread():
         logger = logging.getLogger("trigger")
         try:
-            logger.info(f"[trigger] 开始抓取 {target_date}")
-            raw = scrape_and_store(target_date)
+            import src.remote_llm_api as llm_mod
+            llm_mod._DEFAULT_SEMAPHORE = asyncio.Semaphore(llm_mod._DEFAULT_CONFIG.MAX_CONCURRENCY)
+            llm_mod._DEFAULT_RATE_LIMITER = llm_mod.AsyncQpmRateLimiter(llm_mod._DEFAULT_CONFIG.QPM)
+            llm_mod._DEFAULT_CLIENT = None
 
-            # 如果当天 arXiv 尚无数据，回退到数据库中最近一次有论文的日期
-            actual_date = target_date
-            if not raw:
-                from webapp.database import SessionLocal as _SL
-                from webapp.models import Paper as _Paper
-                _db = _SL()
-                try:
-                    latest = (
-                        _db.query(_Paper.paper_date)
-                        .order_by(_Paper.paper_date.desc())
-                        .first()
-                    )
-                    if latest:
-                        actual_date = latest.paper_date
-                        logger.info(f"[trigger] 当天无数据，回退到 {actual_date}")
-                finally:
-                    _db.close()
+            from datetime import date as _date
+            today = _date.today()
 
-            logger.info(f"[trigger] 抓取完成，开始评分 user_id={user_id} date={actual_date}")
-            asyncio.run(rate_papers_for_user(user_id, actual_date, force=force))
-            logger.info(f"[trigger] 全部完成 user_id={user_id} date={actual_date}")
+            async def _run_all():
+                for i in range(10):
+                    d = today - timedelta(days=i)
+                    logger.info(f"[trigger] 处理 {d}")
+                    raw = scrape_and_store(d)
+                    # check if papers exist in db for this date
+                    from webapp.database import SessionLocal as _SL
+                    from webapp.models import Paper as _Paper
+                    _db = _SL()
+                    try:
+                        has_papers = _db.query(_Paper.id).filter(_Paper.paper_date == d).first() is not None
+                    finally:
+                        _db.close()
+                    if raw or has_papers:
+                        await rate_papers_for_user(user_id, d, force=force)
+                    else:
+                        logger.info(f"[trigger] {d} 无论文数据，跳过")
+
+            asyncio.run(_run_all())
+            logger.info(f"[trigger] 全部完成 user_id={user_id}")
         except Exception as e:
             logger.exception(f"[trigger] 任务失败: {e}")
 
     t = threading.Thread(target=_run_in_thread, daemon=True)
     t.start()
 
-    return {"status": "triggered", "date": target_date.isoformat(), "user": user.username}
+    return {"status": "triggered", "user": user.username}
 
 
 @router.get("/{arxiv_id}/chat/history", response_class=JSONResponse)

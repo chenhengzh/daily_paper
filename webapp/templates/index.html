@@ -260,6 +260,16 @@ async function showDetail(arxivId) {
   if (isNew) await loadChatHistory(arxivId);
 }
 
+function scoreBar(label, val) {
+  if (val == null) return '';
+  const pct = (val / 10 * 100).toFixed(0);
+  return `<div class="detail-score-row">
+    <span class="detail-score-label">${label}</span>
+    <div class="detail-score-bar"><div class="detail-score-fill" style="width:${pct}%"></div></div>
+    <span class="detail-score-val">${val.toFixed(1)}</span>
+  </div>`;
+}
+
 function renderDetail(p) {
   const authors = (p.authors || []).join(', ');
   const score = p.overall_priority_score != null ? p.overall_priority_score : 0;
@@ -282,11 +292,17 @@ function renderDetail(p) {
   ${field || subfield ? `<div style="display:flex;gap:4px;flex-wrap:wrap">${field}${subfield}</div>` : ''}
   ${p.tldr_zh ? `<div class="detail-tldr">${escHtml(p.tldr_zh)}</div>` : ''}
   <div>
-    <div class="detail-section-label">综合评分</div>
+    <div class="detail-section-label">评分</div>
     <div class="detail-score-row">
+      <span class="detail-score-label">综合</span>
       <div class="detail-score-bar"><div class="detail-score-fill" style="width:${pct}%"></div></div>
       <span class="detail-score-val">${score.toFixed ? score.toFixed(1) : score}</span>
     </div>
+    ${scoreBar('相关性', p.relevance_score)}
+    ${scoreBar('质量', p.quality_score)}
+    ${scoreBar('新颖性', p.novelty_claim_score)}
+    ${scoreBar('清晰度', p.clarity_score)}
+    ${scoreBar('影响力', p.potential_impact_score)}
   </div>
   ${signals ? `<div><div class="detail-section-label">信号</div><div>${signals}</div></div>` : ''}
   ${!p.keep && p.keep_reason ? `<div><div class="detail-section-label">过滤原因</div><div class="keep-reason">${escHtml(p.keep_reason)}</div></div>` : ''}
