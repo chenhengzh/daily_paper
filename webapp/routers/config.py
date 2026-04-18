@@ -68,6 +68,8 @@ async def update_config(request: Request, db: Session = Depends(get_db)):
         cfg.interest_table_json = json.dumps(body["interest_table"], ensure_ascii=False)
     if "high_signal_keywords" in body:
         cfg.high_signal_keywords_json = json.dumps(body["high_signal_keywords"], ensure_ascii=False)
+    if "deemphasized_keywords" in body:
+        cfg.deemphasized_keywords_json = json.dumps(body["deemphasized_keywords"], ensure_ascii=False)
     if "notable_authors" in body:
         cfg.notable_authors_json = json.dumps(body["notable_authors"], ensure_ascii=False)
     if "llm_api_key" in body:
@@ -80,6 +82,12 @@ async def update_config(request: Request, db: Session = Depends(get_db)):
         cfg.max_results = int(body["max_results"] or 800)
     if "high_priority_target" in body:
         cfg.high_priority_target = int(body["high_priority_target"] or 15)
+    if "auto_trigger" in body:
+        cfg.auto_trigger = bool(body["auto_trigger"])
+    if "trigger_hour" in body:
+        cfg.trigger_hour = max(0, min(23, int(body["trigger_hour"])))
+    if "trigger_minute" in body:
+        cfg.trigger_minute = max(0, min(59, int(body["trigger_minute"])))
 
     cfg.updated_at = datetime.utcnow()
     db.commit()
@@ -89,19 +97,14 @@ async def update_config(request: Request, db: Session = Depends(get_db)):
 @router.get("/defaults", response_class=JSONResponse)
 async def get_defaults(request: Request, db: Session = Depends(get_db)):
     _current_user_dep(request, db)
-    import sys, os as _os
-    src_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))), "src")
-    if src_dir not in sys.path:
-        sys.path.insert(0, src_dir)
-    from src.filter import INTEREST_TABLE, HIGH_SIGNAL_KEYWORDS, NOTABLE_AUTHORS, DEFAULT_ARXIV_KEYWORDS
-    from src.scraper import DEFAULT_CATEGORIES
-
     return {
-        "keywords": DEFAULT_ARXIV_KEYWORDS,
-        "categories": DEFAULT_CATEGORIES,
-        "interest_table": [{"name": it.get("field", ""), "description": it.get("description", "")} for it in INTEREST_TABLE],
-        "high_signal_keywords": HIGH_SIGNAL_KEYWORDS,
-        "notable_authors": sorted(NOTABLE_AUTHORS),
+        "keywords": ["Agent"],
+        "categories": ["cs.AI", "cs.LG", "cs.CL"],
+        "interest_table": [
+            {"name": "Agent", "description": "LLM-based agents and tool use, excluding domain-specific applications."},
+        ],
+        "high_signal_keywords": ["Agent"],
+        "notable_authors": [],
         "max_results": 800,
         "high_priority_target": 15,
     }
@@ -125,22 +128,30 @@ def _serialize_config(cfg: UserConfig | None) -> dict:
             "categories": [],
             "interest_table": [],
             "high_signal_keywords": [],
+            "deemphasized_keywords": [],
             "notable_authors": [],
             "llm_api_key": "",
             "llm_endpoint": "",
             "llm_model": "",
             "max_results": 800,
             "high_priority_target": 15,
+            "auto_trigger": True,
+            "trigger_hour": 9,
+            "trigger_minute": 30,
         }
     return {
         "keywords": json.loads(cfg.keywords_json or "[]"),
         "categories": json.loads(cfg.categories_json or "[]"),
         "interest_table": _normalize_interest_table(json.loads(cfg.interest_table_json or "[]")),
         "high_signal_keywords": json.loads(cfg.high_signal_keywords_json or "[]"),
+        "deemphasized_keywords": json.loads(cfg.deemphasized_keywords_json or "[]"),
         "notable_authors": json.loads(cfg.notable_authors_json or "[]"),
         "llm_api_key": cfg.llm_api_key or "",
         "llm_endpoint": cfg.llm_endpoint or "",
         "llm_model": cfg.llm_model or "",
         "max_results": cfg.max_results,
         "high_priority_target": cfg.high_priority_target,
+        "auto_trigger": cfg.auto_trigger if cfg.auto_trigger is not None else True,
+        "trigger_hour": cfg.trigger_hour if cfg.trigger_hour is not None else 9,
+        "trigger_minute": cfg.trigger_minute if cfg.trigger_minute is not None else 30,
     }

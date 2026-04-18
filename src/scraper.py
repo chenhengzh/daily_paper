@@ -113,79 +113,6 @@ def _build_category_block(categories: Optional[Iterable[str]]) -> str:
     return "(" + " OR ".join([f"cat:{c}" for c in cats]) + ")"
 
 
-def fetch_cv_papers(category: str = 'cs.CV', max_results: int = 500, specified_date: Optional[date] = None) -> List[Dict[str, Any]]:
-    """历史函数：抓取指定分类在某日提交的论文。
-
-    注意：该函数保留以兼容旧逻辑；新项目请使用 `fetch_daily_papers`。
-
-    Args:
-        category (str): The arXiv category (e.g., 'cs.CV', 'cs.AI').
-        max_results (int): The maximum number of results to retrieve.
-        specified_date (Optional[date]): The specific date to fetch papers for (UTC).
-                                         Defaults to today UTC date.
-
-    Returns:
-        List[Dict[str, Any]]: A list of dictionaries, where each dictionary contains
-                              the 'title', 'summary', 'url', 'published_date',
-                              'updated_date', 'categories', and 'authors' of a paper.
-                              Returns an empty list if an error occurs or no papers are found.
-    """
-    if specified_date is None:
-        specified_date = datetime.now(timezone.utc).date()
-        logging.info(f"No date specified, defaulting to {specified_date.strftime('%Y-%m-%d')} UTC.")
-    else:
-        logging.info(f"Fetching papers for specified date: {specified_date.strftime('%Y-%m-%d')} UTC.")
-
-    # 兼容旧实现：以 UTC 为基准，取 [D-1, D) 的 submittedDate
-    specified_dt = datetime.combine(specified_date, datetime.min.time()).replace(tzinfo=timezone.utc)
-    start_time = specified_dt - timedelta(days=1)
-    start_time_str = _fmt_arxiv_dt(start_time)
-    end_time_str = _fmt_arxiv_dt(specified_dt)
-
-    # Construct the search query
-    query = f'cat:{category} AND submittedDate:[{start_time_str} TO {end_time_str}]'
-    logging.info(f"Using arXiv query: {query}")
-
-    client = arxiv.Client()
-    search = arxiv.Search(
-        query=query,
-        max_results=max_results,
-        sort_by=arxiv.SortCriterion.SubmittedDate
-    )
-
-    papers: List[Dict[str, Any]] = []
-    try:
-        results = client.results(search)
-        # Iterate through the generator
-        count = 0
-        for result in results:
-            arxiv_id = _extract_arxiv_id(getattr(result, "entry_id", "") or "")
-            abs_url = getattr(result, "entry_id", "")
-            papers.append({
-                'arxiv_id': arxiv_id,
-                'title': result.title,
-                'summary': (result.summary or "").strip(),
-                'url': abs_url,
-                'abs_url': abs_url,
-                'pdf_url': f"https://arxiv.org/pdf/{arxiv_id}.pdf" if arxiv_id else None,
-                'published_date': result.published,
-                'updated_date': result.updated,
-                'categories': result.categories,
-                'authors': [author.name for author in result.authors],
-            })
-            count += 1
-        logging.info(f"Successfully fetched {count} papers submitted on {specified_date.strftime('%Y-%m-%d')} from {category}.")
-
-    except arxiv.arxiv.UnexpectedEmptyPageError as e:
-        logging.warning(f"arXiv query returned an empty page (potentially no results for the date/query): {e}")
-        # This might not be a critical error, could just mean no papers found
-    except arxiv.arxiv.HTTPError as e:
-        logging.error(f"HTTP error during arXiv search: {e}")
-    except Exception as e:
-        logging.error(f"An unexpected error occurred during arXiv search: {e}", exc_info=True)
-        # Log the full traceback for unexpected errors
-
-    return papers
 
 
 def fetch_daily_papers(
@@ -223,7 +150,7 @@ def fetch_daily_papers(
     logging.info(f"Using arXiv query: {query}")
 
     def _run_query(q: str) -> List[Dict[str, Any]]:
-        client = arxiv.Client(page_size=200, delay_seconds=3, num_retries=6)
+        client = arxiv.Client(page_size=200, delay_seconds=1, num_retries=3)
         search = arxiv.Search(query=q, max_results=max_results, sort_by=arxiv.SortCriterion.SubmittedDate)
         out: list[dict[str, Any]] = []
         for r in client.results(search):
@@ -293,16 +220,9 @@ def fetch_daily_papers(
     return out
 
 if __name__ == '__main__':
-    logging.info("Starting arXiv paper fetching example...")
-    # Example usage: Fetch papers for a specific date
-    # Note: Using a future date like 2025 will likely return 0 results unless arXiv data exists for it.
-    # Use a recent past date for better testing.
-    # example_date = date.today() - timedelta(days=4) # Example: 4 days ago
-    example_date = date(2025, 4, 26) # Or a specific past date known to have papers
-
+    example_date = date(2025, 4, 26)
     logging.info(f"Fetching papers for {example_date.strftime('%Y-%m-%d')}...")
-    latest_papers = fetch_cv_papers(category='cs.CV', max_results=500, specified_date=example_date)
-
+    latest_papers = fetch_daily_papers(specified_date=example_date, max_results=500)
     if latest_papers:
         logging.info(f"--- Found {len(latest_papers)} Papers ---")
         for i, paper in enumerate(latest_papers):

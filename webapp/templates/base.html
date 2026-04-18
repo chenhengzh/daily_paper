@@ -24,10 +24,12 @@
     <div class="nav-links">
       <a href="/papers" class="{% if request.url.path.startswith('/papers') %}active{% endif %}">论文</a>
       <a href="/config" class="{% if request.url.path.startswith('/config') %}active{% endif %}">配置</a>
+      {% if user.is_admin %}<a href="/admin/" class="{% if request.url.path.startswith('/admin') %}active{% endif %}">管理</a>{% endif %}
+      {% if user.is_admin %}<a href="/logs/" class="{% if request.url.path.startswith('/logs') %}active{% endif %}">日志</a>{% endif %}
       <button class="btn-icon" id="themeToggle" onclick="toggleTheme()" title="切换主题" style="font-size:16px;padding:2px 6px">☀</button>
       <span class="nav-user">{{ user.username }}</span>
       <form action="/auth/logout" method="post" style="display:inline">
-        <button type="submit" class="btn-link">注销</button>
+        <button type="submit" class="btn-link">登出</button>
       </form>
     </div>
   </nav>

@@ -73,10 +73,8 @@ class RemoteLLMConfig:
     MODEL_NAME: str = os.getenv("AZURE_MODEL_NAME", os.getenv("OPENAI_MODEL_NAME", "deepseek-v3.2-huawei"))
 
     # --- 核心超参 ---
-    # QPM 要求：Gemini 2.5 设置为 256（可通过 env 覆盖）
-    QPM: int = _env_int("AZURE_QPM", 256)
-    # 并发上限：避免同时大量 in-flight request
-    MAX_CONCURRENCY: int = _env_int("AZURE_MAX_CONCURRENCY", 64)
+    QPM: int = _env_int("AZURE_QPM", 30)
+    MAX_CONCURRENCY: int = _env_int("AZURE_MAX_CONCURRENCY", 8)
     # 网络/SDK timeout（秒）。同时会用 asyncio.wait_for 兜底。
     TIMEOUT_S: float = _env_float("AZURE_TIMEOUT_S", 120.0)
     # 重试与退避
@@ -166,7 +164,8 @@ async def chat_completion_text(
     reasoning_effort: Optional[str] = None,
     request_kwargs: Optional[Dict[str, Any]] = None,
     api_retries: Optional[int] = None,
-) -> str:
+) -> tuple[str, dict]:
+    """Returns (text, usage) where usage = {input_tokens, output_tokens}."""
 
     last_err: Optional[Exception] = None
     max_retries = int(api_retries) if api_retries is not None else int(_DEFAULT_CONFIG.API_RETRIES)
@@ -211,7 +210,12 @@ async def chat_completion_text(
                     resp = await call
 
             content = resp.choices[0].message.content
-            return str(content)
+            usage = resp.usage
+            usage_dict = {
+                "input_tokens": getattr(usage, "prompt_tokens", 0) or 0,
+                "output_tokens": getattr(usage, "completion_tokens", 0) or 0,
+            }
+            return str(content), usage_dict
 
         except (APIError, RateLimitError, APITimeoutError) as e:
             last_err = e
@@ -239,8 +243,8 @@ async def default_chat_completion_text(
     reasoning_effort: Optional[str] = None,
     request_kwargs: Optional[Dict[str, Any]] = None,
     api_retries: Optional[int] = None,
-) -> str:
-    """使用默认 client/限流器/并发控制的快捷封装。"""
+) -> tuple[str, dict]:
+    """使用默认 client/限流器/并发控制的快捷封装。Returns (text, usage)."""
 
     return await chat_completion_text(
         namespace=namespace,

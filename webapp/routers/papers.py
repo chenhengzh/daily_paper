@@ -128,15 +128,13 @@ async def papers_api(
             "relevance_score": result.relevance_score,
             "quality_score": result.quality_score,
             "novelty_claim_score": result.novelty_claim_score,
-            "clarity_score": result.clarity_score,
-            "potential_impact_score": result.potential_impact_score,
+            "impact_score": result.potential_impact_score,
             "overall_priority_score": result.overall_priority_score,
             "tier": result.tier,
             "high_priority": result.high_priority,
             "high_priority_rank": result.high_priority_rank,
             "signal_high_keywords": json.loads(result.signal_high_keywords_json or "[]"),
             "signal_notable_authors": json.loads(result.signal_notable_authors_json or "[]"),
-            "signal_low_keywords": json.loads(result.signal_low_keywords_json or "[]"),
         })
 
     # 按 overall_priority_score 降序
@@ -208,19 +206,18 @@ async def paper_detail(arxiv_id: str, request: Request, db: Session = Depends(ge
             "interest_match_reason": result.interest_match_reason,
             "tldr": result.tldr,
             "tldr_zh": result.tldr_zh,
+            "summary_zh": result.summary_zh,
             "tags": json.loads(result.tags_json or "[]"),
             "relevance_score": result.relevance_score,
             "quality_score": result.quality_score,
             "novelty_claim_score": result.novelty_claim_score,
-            "clarity_score": result.clarity_score,
-            "potential_impact_score": result.potential_impact_score,
+            "impact_score": result.potential_impact_score,
             "overall_priority_score": result.overall_priority_score,
             "tier": result.tier,
             "high_priority": result.high_priority,
             "high_priority_rank": result.high_priority_rank,
             "signal_high_keywords": json.loads(result.signal_high_keywords_json or "[]"),
             "signal_notable_authors": json.loads(result.signal_notable_authors_json or "[]"),
-            "signal_low_keywords": json.loads(result.signal_low_keywords_json or "[]"),
             "signal_evidence_keywords": json.loads(result.signal_evidence_keywords_json or "[]"),
         })
     return data
@@ -284,8 +281,31 @@ async def trigger_job(
                     finally:
                         _db.close()
                     if raw or has_papers:
-                        _push({"type": "rating", "date": d.isoformat(), "count": len(raw) if raw else 0})
+                        from webapp.models import DailyJob as _DailyJob
+                        total_count = len(raw) if raw else 0
+                        _push({"type": "rating", "date": d.isoformat(), "count": total_count, "rated": 0})
+
+                        async def _poll_progress(target_date=d, total=total_count):
+                            from webapp.database import SessionLocal as _SL2
+                            while True:
+                                await asyncio.sleep(2)
+                                _pdb = _SL2()
+                                try:
+                                    _job = _pdb.query(_DailyJob).filter(
+                                        _DailyJob.user_id == user_id,
+                                        _DailyJob.job_date == target_date,
+                                    ).first()
+                                    if not _job or _job.status in ("done", "failed"):
+                                        break
+                                    rated = _job.rated_count or 0
+                                    scrape = _job.scrape_count or total
+                                    _push({"type": "rating", "date": target_date.isoformat(), "count": scrape, "rated": rated})
+                                finally:
+                                    _pdb.close()
+
+                        poll_task = asyncio.create_task(_poll_progress())
                         await rate_papers_for_user(user_id, d, force=force)
+                        poll_task.cancel()
                         _push({"type": "done_date", "date": d.isoformat()})
                         processed += 1
                     else:
@@ -462,7 +482,7 @@ def _parse_date(date_str: Optional[str]) -> date:
 def _get_user_dates(user_id: int, db: Session) -> list[date]:
     rows = (
         db.query(DailyJob.job_date)
-        .filter(DailyJob.user_id == user_id, DailyJob.status == "done")
+        .filter(DailyJob.user_id == user_id, DailyJob.status.in_(["done", "rating"]))
         .order_by(DailyJob.job_date.desc())
         .all()
     )

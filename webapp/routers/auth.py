@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from webapp.database import get_db
-from webapp.models import User, UserConfig
+from webapp.models import User, UserConfig, InviteCode
 from webapp.auth import hash_password, verify_password
 import json, os
 
@@ -58,6 +58,7 @@ async def register(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
+    invite_code: str = Form(""),
     db: Session = Depends(get_db),
 ):
     if len(username) < 2 or len(username) > 32:
@@ -68,25 +69,33 @@ async def register(
     if existing:
         return _tmpl(request, "login.html", {"error": "用户名已存在", "mode": "register"}, status_code=400)
 
-    is_first = db.query(User).count() == 0
-    user = User(username=username, hashed_password=hash_password(password), is_admin=is_first)
+    # 必须提供邀请码
+    invite_code = invite_code.strip()
+    if not invite_code:
+        return _tmpl(request, "login.html", {"error": "注册需要邀请码", "mode": "register"}, status_code=400)
+    invite_obj = db.query(InviteCode).filter(InviteCode.code == invite_code).first()
+    if not invite_obj:
+        return _tmpl(request, "login.html", {"error": "邀请码无效", "mode": "register"}, status_code=400)
+    if invite_obj.used_by is not None:
+        return _tmpl(request, "login.html", {"error": "邀请码已被使用", "mode": "register"}, status_code=400)
+
+    user = User(
+        username=username,
+        hashed_password=hash_password(password),
+        is_admin=False,
+        user_type=invite_obj.code_type,
+        used_invite_code=invite_code,
+    )
     db.add(user)
     db.flush()
 
-    _DEFAULT_KEYWORDS = ["LLM", "Agent", "Reinforcement Learning", "Tool Use"]
+    _DEFAULT_KEYWORDS = ["Agent"]
     _DEFAULT_CATEGORIES = ["cs.AI", "cs.LG", "cs.CL"]
     _DEFAULT_INTEREST_TABLE = [
-        {"name": "LLM", "description": "Large language model training, alignment, RLHF, reasoning, scaling, and inference optimization."},
-        {"name": "Agent", "description": "LLM-based agents, tool use, multi-agent systems, agentic workflows, and test-time compute scaling."},
+        {"name": "Agent", "description": "LLM-based agents and tool use, excluding domain-specific applications."},
     ]
-    _DEFAULT_HIGH_SIGNAL = ["reinforcement learning", "policy optimization", "self-play", "agent", "tool use", "memory"]
-    _DEFAULT_NOTABLE_AUTHORS = [
-        "Andrej Karpathy", "Chelsea Finn", "David Silver", "Denny Zhou",
-        "Doina Precup", "Geoffrey Hinton", "Ilya Sutskever", "John Schulman",
-        "Noam Shazeer", "Percy Liang", "Pieter Abbeel", "Richard S. Sutton",
-        "Richard Sutton", "Satinder Singh", "Sergey Levine", "Shane Legg",
-        "Yann LeCun", "Yarin Gal", "Yoshua Bengio",
-    ]
+    _DEFAULT_HIGH_SIGNAL = ["Agent"]
+    _DEFAULT_NOTABLE_AUTHORS = []
 
     config = UserConfig(
         user_id=user.id,
@@ -101,6 +110,11 @@ async def register(
         high_priority_target=15,
     )
     db.add(config)
+    db.flush()
+
+    # 邀请码用完即删
+    db.delete(invite_obj)
+
     db.commit()
 
     request.session["user_id"] = user.id

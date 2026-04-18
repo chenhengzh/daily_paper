@@ -20,148 +20,16 @@ except ModuleNotFoundError:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-INTEREST_TABLE: list[dict[str, str]] = [
-    # --- RL ---
-    {"field": "RL", "subfield": "MultiModal RL", "description": "Techniques & algorithms related to RL in multi-modal environments."},
-    {"field": "RL", "subfield": "SFT v.s. RL", "description": "Theories/algorithms/findings related to understanding/bridging the gap between SFT and RL."},
-    {"field": "RL", "subfield": "RL Infra", "description": "Building RL infrastructures."},
-    {"field": "RL", "subfield": "RLHF", "description": "Theories/algorithms/findings about RL with human feedback."},
-    {"field": "RL", "subfield": "RLVF", "description": "Theories/algorithms/findings about RL with verifiable feedback."},
-    {"field": "RL", "subfield": "RL Efficiency", "description": "Improving the sampling complexity of RL."},
-    {"field": "RL", "subfield": "Unsupervised/Self-Play RL", "description": "RL without external rewards."},
-    {"field": "RL", "subfield": "RL Theory", "description": "Fundamental theories about RL."},
-    {"field": "RL", "subfield": "Beyond Trial & Error", "description": "Improving RL training beyond trial and error."},
-    {"field": "RL", "subfield": "Agentic RL", "description": "RL with tools and agentic environments."},
-    {"field": "RL", "subfield": "Classic RL", "description": "Bandit/Tabular/MDP learning techniques and theories."},
-    {"field": "RL", "subfield": "RL & Robotics", "description": "Applying RL to embodied AI."},
-    {"field": "RL", "subfield": "RL for Diffusion", "description": "Training Diffusion Model/Policy with RL."},
-    {"field": "RL", "subfield": "RL + Distillation", "description": "Combining RL techniques with distillation."},
-    # --- General LLM ---
-    {"field": "General LLM", "subfield": "(Continuous) Pre-training", "description": "Findings/algorithms."},
-    {"field": "General LLM", "subfield": "Scaling Laws", "description": "Various scaling laws."},
-    {"field": "General LLM", "subfield": "Decoding Strategy", "description": "Improving AR performance beyond random sampling."},
-    # --- Trustworthy LLM ---
-    {"field": "Trustworthy LLM", "subfield": "RLHF Theory/Understanding", "description": "Theories into the process of RLHF."},
-    {"field": "Trustworthy LLM", "subfield": "Agentic Safety", "description": "Studying safety in an agentic environment."},
-    {"field": "Trustworthy LLM", "subfield": "Privacy/Fairness/Faithfulness of LLMs", "description": "Privacy/fairness concerns of LLMs."},
-    # --- Agents ---
-    {"field": "Agents", "subfield": "Building Agents/workflow", "description": "Techniques relating to building Agentic workflow."},
-    {"field": "Agents", "subfield": "Scaling Test-time Compute", "description": "Theories/techniques about scaling test-time compute."},
-    # --- Multimodal LLM ---
-    {"field": "Multimodal LLM", "subfield": "Architectures", "description": "Architectural design of multimodal LLMs."},
-    # --- Diffusion LLM ---
-    {"field": "Diffusion LLM", "subfield": "Principles and Implementations", "description": "Principles and Architectures for Diffusion LLM."},
-    {"field": "Diffusion LLM", "subfield": "Post Training", "description": "Post-training Methods for Diffusion LLMs."},
-    # --- World Models ---
-    {"field": "World Models", "subfield": "Principles and Implementations", "description": "Building Neural Networks that Approximate the Real World."},
-]
-
-
 # --- 你关心的“高信号”要素（用于在 LLM 打分后做二次校准）---
 # 目的：
 # - 防止 LLM 给太多 paper 打高分
 # - 将“LLM/MLLM 的 RL / world model / 突破性进展 / 大牛作者”显式提升
 
 # 领域大牛（可按你个人偏好继续补充/删减）
-NOTABLE_AUTHORS: set[str] = {
-    # RL
-    "Richard S. Sutton",
-    "Richard Sutton",
-    "David Silver",
-    "Sergey Levine",
-    "Pieter Abbeel",
-    "John Schulman",
-    "Shane Legg",
-    "Doina Precup",
-    "Satinder Singh",
-    "Chelsea Finn",
-    "Yarin Gal",
-    # LLM / Agents
-    "Ilya Sutskever",
-    "Andrej Karpathy",
-    "Percy Liang",
-    "Denny Zhou",
-    "Noam Shazeer",
-    "Yoshua Bengio",
-    "Yann LeCun",
-    "Geoffrey Hinton",
-}
+NOTABLE_AUTHORS: set[str] = set()
 
-# 强相关关键词：偏向 LLM/MLLM 的 RL / world model / agent / test-time compute
 HIGH_SIGNAL_KEYWORDS: list[str] = [
-    # RL for LLM/MLLM
-    "rlhf",
-    "rlaif",
-    "rlvf",
-    "reinforcement learning",
-    "policy optimization",
-    "ppo",
-    "dpo",
-    "orpo",
-    "grpo",
-    "ipo",
-    "preference optimization",
-    "reward model",
-    "verifiable",
-    "process reward",
-    "outcome reward",
-    "self-play",
-    "online rl",
-    "off-policy",
-    # World model / model-based
-    "world model",
-    "latent dynamics",
-    "model-based",
-    "dreamer",
-    "imagination",
-    "planning",
-    "long-horizon",
-    "temporal abstraction",
-    # Agents / test-time compute
-    "agent",
-    "tool use",
-    "test-time compute",
-    "reasoning",
-    "planning",
-    "memory",
-    # Multimodal
-    "multimodal",
-    "mllm",
-    "vision-language",
-    "video",
-    "robot",
-    "embodied",
-    # Theory / principled insights / large-scale phenomena
-    "theorem",
-    "proof",
-    "convergence",
-    "regret",
-    "generalization",
-    "generalisation",
-    "sample complexity",
-    "lower bound",
-    "upper bound",
-    "information-theoretic",
-    "principled",
-    "mechanistic",
-    "phenomenon",
-    "phase transition",
-    "emergent",
-    "scaling law",
-    "universality",
-    "invariant",
-    # Insight / phenomenon-driven analysis (e.g., temporal reasoning)
-    "temporal reasoning",
-    "tokenization",
-    "tokenisation",
-    "subword",
-    "bpe",
-    "calendar",
-    "multilingual",
-    "low-resource",
-    "diagnostic",
-    "what really controls",
-    "representation of time",
+    "Agent",
 ]
 
 # “突破性/强声明”提示词：不保证真突破，但可作为优先级提升信号
@@ -178,77 +46,8 @@ BREAKTHROUGH_CLAIM_KEYWORDS: list[str] = [
     "orders of magnitude",
 ]
 
-# 明显低信号（用于轻微降权/更严格 keep）：注意不要过度惩罚 survey/benchmark（有时也很重要）
-LOW_SIGNAL_KEYWORDS: list[str] = [
-    "case study",
-    "application",
-    "industrial",
-    "deployment",
-    "edge device",
-    "hyperparameter",
-    "ablation only",
-    "dataset",
-    "benchmark",
-    "leaderboard",
-    "survey",
-    "tutorial",
-    # governance / role-play simulations (often too scenario-specific)
-    "governance",
-    "corruption",
-    "role-play",
-    "roleplay",
-    # "foundation/guide" type writing (often tutorial-like, sometimes low-signal)
-    "foundations",
-    "foundation",
-    "primer",
-    "guide",
-    "introduction",
-    # outdated / classic-theory framing (heuristic)
-    "epsilon-greedy",
-    "single-index",
-    "single-index bandit",
-    "schrödinger bridge",
-    "schrodinger bridge",
-    # narrow/specific applications (often low generality)
-    "real-world",
-    "in the wild",
-    "deployment",
-    "industrial",
-    "clinical",
-    "medical",
-    "radiology",
-    "electronic health record",
-    "smart city",
-    "traffic",
-    "agriculture",
-    "recommendation system",
-    "edge",
-    "iot",
-    "underwater",
-    "aerial",
-    "uav",
-    "satellite",
-]
 
-
-# 你不太想优先看的方向：用于 postprocess 的轻微降权（不是强过滤）
-DEEMPHASIZED_KEYWORDS: list[str] = [
-    # safety/alignment & security-only work
-    "safety",
-    "alignment",
-    "jailbreak",
-    "red teaming",
-    "guardrail",
-    "policy compliance",
-    "toxic",
-    "harmful",
-    "prompt injection",
-    "security awareness",
-    "privacy",
-    "fairness",
-    "bias",
-]
-
+DEEMPHASIZED_KEYWORDS: list[str] = []
 
 # 明显低质量/不需要的内容：强过滤
 LOW_QUALITY_TITLE_PATTERNS: list[re.Pattern] = [
@@ -298,94 +97,14 @@ EVIDENCE_KEYWORDS: list[str] = [
 ]
 
 
-def interests_markdown() -> str:
-    lines = [
-        "# My Paper Selection Principles",
-        "- Prefer general technical innovation, deep and broadly impactful insights, and large-scale phenomenon discovery (can be theory-leaning).",
-        "- Be critical: distinguish real innovation/new findings from concept stacking, superficial framing, or overly specific scenarios.",
-        "- De-emphasize safety/alignment/security-only papers and narrow agent behavior case studies unless they uncover general principles.",
-        "- Use ICML/ICLR/NeurIPS standards: credible methods (theory or strong empirical evidence), clear problem, and meaningful contribution.",
-        "\n# My Paper Interest Taxonomy",
-    ]
-    for r in INTEREST_TABLE:
-        lines.append(f"- {r['field']} / {r['subfield']}: {r['description']}")
-    return "\n".join(lines)
-
-
-def arxiv_query_keywords(max_terms: int = 24) -> list[str]:
-    """用于 arXiv 查询的关键词（要短、强覆盖，避免 query 过长）。"""
-    base = [
-        "LLM",
-        "language model",
-        "RL",
-        "Reinforcement Learning",
-        "RLHF",
-        "RLAIF",
-        "verifiable reward",
-        "self-play",
-        "bandit",
-        "MDP",
-        "SFT",
-        "pre-training",
-        "scaling law",
-        "decoding",
-        "Agent",
-        "tool use",
-        "test-time compute",
-        "world model",
-        "model-based",
-        "multimodal",
-        "robotics",
-        "diffusion",
-        "distillation",
-        "privacy",
-        "fairness",
-        "faithfulness",
-        "safety",
-    ]
-    out: list[str] = []
-    seen: set[str] = set()
-    for k in base:
-        kk = k.strip()
-        if not kk:
-            continue
-        low = kk.lower()
-        if low in seen:
-            continue
-        seen.add(low)
-        out.append(kk)
-        if len(out) >= int(max_terms):
-            break
-    return out
-
-
-DEFAULT_INTERESTS = interests_markdown()
-DEFAULT_ARXIV_KEYWORDS = arxiv_query_keywords()
+DEFAULT_ARXIV_KEYWORDS: list[str] = [
+    "Agent",
+]
 
 
 def _heuristic_fallback(papers: list, interests: str) -> list:
     """当未配置 LLM key 时的兜底：用简单关键词匹配填充基础字段，保证流水线可跑通。"""
-    # interests 是 markdown 文本，这里抽取一些关键 token 做兜底匹配
-    keys = [
-        "llm",
-        "language model",
-        "reinforcement learning",
-        "rlhf",
-        "rlvf",
-        "agent",
-        "world model",
-        "multimodal",
-        "diffusion",
-        "robotics",
-        "safety",
-        "privacy",
-        "fairness",
-        "faithfulness",
-        "scaling law",
-        "pre-training",
-        "decoding",
-        "distillation",
-    ]
+    keys = [k.lower() for k in DEFAULT_ARXIV_KEYWORDS]
     for p in papers:
         text = f"{p.get('title','')}\n{p.get('summary','')}".lower()
         hit = sum(1 for k in keys if k and k in text)
@@ -425,8 +144,8 @@ def _extract_json_object(s: str) -> str:
     return s
 
 
-async def _repair_to_valid_json(*, namespace: str, raw: str) -> str:
-    """当模型输出非严格 JSON 时，做一次轻量修复调用。"""
+async def _repair_to_valid_json(*, namespace: str, raw: str) -> tuple[str, dict]:
+    """当模型输出非严格 JSON 时，做一次轻量修复调用。Returns (text, usage)."""
     messages = [
         {
             "role": "system",
@@ -444,56 +163,61 @@ async def _repair_to_valid_json(*, namespace: str, raw: str) -> str:
 
 rating_prompt_template = """
 # Role
-You are a careful, time-constrained AI researcher who triages arXiv papers for daily reading.
+You are a senior AI researcher triaging arXiv papers for a colleague's daily reading list. Filter ruthlessly and score honestly — most papers should not make the cut.
 
-# Goal
-Given ONLY the title and abstract, do a coarse screening and a preliminary rating.
-
-# Input
-Paper Title: %s
-Paper Abstract: %s
-
-# My Research Interests (for relevance + classification)
+# Researcher's Interests
 %s
 
-# Coarse Screening Rules
-- Mark keep=false if the paper is clearly low-signal for a researcher (e.g., vague claims, no method details, obvious incremental engineering without insight, weak/empty abstract, purely dataset/benchmark with little novelty, or off-topic).
-- Mark keep=false for obvious low-quality items: theses/dissertations/technical reports, rambling single-author manuscripts with weak evidence, or extremely niche application-only papers.
-- IMPORTANT CALIBRATION: be selective. In a typical day, only a small fraction should be high priority.
-  - Only ~5%% of papers deserve overall_priority_score >= 8.0
-  - Only ~10%% of papers deserve overall_priority_score >= 7.5
-  - If you are unsure, give a conservative score (6-7) and/or keep=false.
-- I care MOST about: general technical innovation and broadly impactful insights (can be theory-leaning), plus important large-scale phenomenon discoveries.
-- De-emphasize: safety/alignment/security-only papers, and narrow agent case studies (unless they reveal general principles).
-- Be critical at ICML/ICLR/NeurIPS standards: is it real novelty with substance (theory/proof or strong empirical evidence), or just concept stacking / narrow scenario engineering?
-- If the abstract is ambiguous but potentially important, prefer keep=true with lower confidence, but do NOT give a high overall score.
+# Paper to Evaluate
+Title: %s
+Abstract: %s
 
-# Output Requirements (MUST)
-- Output JSON only (RFC8259). No markdown, no code fences, no trailing commas.
-- Use numbers 1-10 for scores.
-- keep must be a boolean.
+# Triage Rules (apply in order)
+1. **Relevance gate**: If the paper does not address any of the researcher's stated interests, set keep=false immediately. Do not inflate scores to compensate.
+2. **Quality gate**: Reject (keep=false) papers that are clearly low-signal — vague or empty abstracts, purely incremental engineering with no novel insight, dataset/benchmark papers with no methodological contribution, theses/dissertations/technical reports, or rambling single-author manuscripts.
+3. **Calibration**: Apply ICML/ICLR/NeurIPS reviewer standards. Ask whether there is genuine novelty backed by theory or strong empirical evidence, not just concept stacking or narrow application.
+   - Only ~5%% of papers warrant overall_priority_score >= 8.0
+   - Only ~10%% warrant overall_priority_score >= 7.5
+   - When uncertain, assign a conservative score (5-6) rather than a generous one.
+4. **Ambiguous cases**: If the abstract hints at something potentially important but is unclear, prefer keep=true with a low-to-mid score rather than discarding.
 
-# Output JSON Schema
+# Scoring Dimensions (1-10 each)
+- **relevance_score**: How well the paper aligns with the researcher's stated interests.
+- **quality_score**: Rigor and credibility — method clarity, evaluation strength, theoretical grounding.
+- **novelty_claim_score**: Originality and strength of the novelty claim.
+- **impact_score**: Potential to change how the field thinks or builds things.
+- **overall_priority_score**: Holistic read priority; weight relevance and quality most heavily.
+
+# Output Fields
+- **keep**: boolean. False if the paper fails the relevance or quality gate.
+- **keep_reason**: one sentence explaining the keep/reject decision.
+- **interest_field**: the most relevant top-level interest area from the researcher's list (or "Other").
+- **interest_subfield**: a more specific sub-topic within that field.
+- **interest_match_reason**: one sentence on why (or why not) this paper matches the interests.
+- **tldr**: one English sentence (<=30 words) capturing the core contribution.
+- **tldr_zh**: 3-5 Chinese sentences covering: (1) the problem or gap, (2) the proposed method or key finding with concrete detail, (3) main results, (4) significance. Be specific — avoid openers like "本文提出了一种方法".
+- **summary_zh**: 5-8 Chinese sentences. A technical mini-review: motivation and background, method in mechanistic terms (architecture/algorithm/training), key quantitative results, limitations or open questions, and why this work matters. Write as a knowledgeable researcher, not a translator.
+- **tags**: list of short keyword strings.
+
+# Output Format
+Respond with a single valid JSON object (RFC 8259). No markdown, no code fences, no trailing commas.
+
 {
   "keep": true,
   "keep_reason": "...",
-  "interest_field": "RL",
-  "interest_subfield": "RLHF",
+  "interest_field": "...",
+  "interest_subfield": "...",
   "interest_match_reason": "...",
   "tldr": "...",
   "tldr_zh": "...",
+  "summary_zh": "...",
   "tags": ["..."],
   "relevance_score": 1,
   "quality_score": 1,
   "novelty_claim_score": 1,
+  "impact_score": 1,
   "overall_priority_score": 1
 }
-
-# Scoring Hints
-- relevance_score: alignment with my interests.
-- quality_score: how rigorous/credible the contribution seems from abstract (method + eval signals).
-- novelty_claim_score: strength of novelty claim.
-- overall_priority_score: prioritize papers that are BOTH relevant AND high-quality.
 """
 
 
@@ -570,6 +294,7 @@ def _postprocess_one(p: Dict[str, Any]) -> Dict[str, Any]:
     p["relevance_score"] = _clamp_score(p.get("relevance_score", 0))
     p["quality_score"] = _clamp_score(p.get("quality_score", 0))
     p["novelty_claim_score"] = _clamp_score(p.get("novelty_claim_score", 0))
+    p["impact_score"] = _clamp_score(p.get("impact_score", 0))
 
     p["overall_priority_score"] = _clamp_score(p.get("overall_priority_score", 0))
 
@@ -590,30 +315,17 @@ def _postprocess_one(p: Dict[str, Any]) -> Dict[str, Any]:
 
     hs_hits = _keyword_hits(text, HIGH_SIGNAL_KEYWORDS)
     bt_hits = _keyword_hits(text, BREAKTHROUGH_CLAIM_KEYWORDS)
-    low_hits = _keyword_hits(text, LOW_SIGNAL_KEYWORDS)
     deemph_hits = _keyword_hits(text, DEEMPHASIZED_KEYWORDS)
     concept_hits = _keyword_hits(text, CONCEPT_STACKING_KEYWORDS)
     evidence_hits = _keyword_hits(text, EVIDENCE_KEYWORDS)
     author_hits = _author_hits(p)
     n_authors = _author_count(p)
 
-    # 轻量打分修正：高信号 + 大牛略微加分；明显低信号轻微减分
+    # 轻量打分修正：高信号 + 大牛略微加分
     boost = 0.0
     boost += min(0.8, 0.15 * len(hs_hits))
     boost += min(0.4, 0.10 * len(bt_hits))
     boost += 0.35 if author_hits else 0.0
-
-    # 低信号惩罚：benchmark/dataset 属于“软惩罚”（有时也可能是高质量 insight 论文）
-    soft_low = {"dataset", "benchmark", "leaderboard"}
-    soft_cnt = 0
-    heavy_cnt = 0
-    for h in low_hits:
-        hl = (h or "").strip().lower()
-        if hl in soft_low:
-            soft_cnt += 1
-        else:
-            heavy_cnt += 1
-    boost -= min(0.7, 0.15 * float(heavy_cnt) + 0.05 * float(soft_cnt))
 
     # 降权：safety/alignment/security-only & 过度具体 case
     boost -= min(0.6, 0.12 * len(deemph_hits))
@@ -646,9 +358,6 @@ def _postprocess_one(p: Dict[str, Any]) -> Dict[str, Any]:
     if (not hs_hits) and p["relevance_score"] <= 5.0 and p["quality_score"] <= 6.0:
         boost -= 0.4
 
-    # “窄场景工程 + 低实质”更严格下压
-    if len(low_hits) >= 2 and len(evidence_hits) == 0 and p["quality_score"] <= 6.0:
-        boost -= 0.4
 
     p["overall_priority_score"] = _clamp_score(p["overall_priority_score"] + boost)
 
@@ -671,7 +380,6 @@ def _postprocess_one(p: Dict[str, Any]) -> Dict[str, Any]:
     p["signal_high_keywords"] = hs_hits[:12]
     p["signal_breakthrough_keywords"] = bt_hits[:12]
     p["signal_notable_authors"] = author_hits[:8]
-    p["signal_low_keywords"] = low_hits[:10]
     p["signal_deemphasized_keywords"] = deemph_hits[:10]
     p["signal_evidence_keywords"] = evidence_hits[:10]
     p["signal_concept_keywords"] = concept_hits[:10]
@@ -701,14 +409,16 @@ async def _rate_one_paper(
                 "relevance_score": 0,
                 "quality_score": 0,
                 "novelty_claim_score": 0,
+                "impact_score": 0,
                 "tldr": "",
                 "tldr_zh": "",
+                "summary_zh": "",
                 "tags": [],
             }
         )
         return paper
 
-    prompt = rating_prompt_template % (title, abstract, interests)
+    prompt = rating_prompt_template % (interests, title, abstract)
     messages = [
         {
             "role": "system",
@@ -720,17 +430,18 @@ async def _rate_one_paper(
     last_err: Optional[Exception] = None
     for attempt in range(max(1, api_retries)):
         try:
-            raw = await default_chat_completion_text(
+            raw, usage = await default_chat_completion_text(
                 namespace="paper_rating",
                 messages=messages,
                 max_tokens=4096,
                 temperature=0.3,
             )
+
             raw2 = _extract_json_object(raw)
             try:
                 data = json.loads(raw2)
             except json.JSONDecodeError:
-                repaired = await _repair_to_valid_json(namespace="paper_rating_repair", raw=raw2)
+                repaired, _ = await _repair_to_valid_json(namespace="paper_rating_repair", raw=raw2)
                 data = json.loads(_extract_json_object(repaired))
 
             if not isinstance(data, dict):
@@ -747,8 +458,12 @@ async def _rate_one_paper(
 
             data.setdefault("tldr", "")
             data.setdefault("tldr_zh", "")
+            data.setdefault("summary_zh", "")
+            data.setdefault("impact_score", 0)
 
             paper.update(data)
+            paper["_llm_input_tokens"] = usage.get("input_tokens", 0)
+            paper["_llm_output_tokens"] = usage.get("output_tokens", 0)
             logging.info(
                 f"评分 {idx+1}/{total}: keep={paper.get('keep')} score={paper.get('overall_priority_score')} title='{title[:60]}'"
             )
@@ -759,6 +474,9 @@ async def _rate_one_paper(
             logging.warning(
                 f"评分失败 {idx+1}/{total} attempt={attempt+1}/{api_retries} title='{title[:60]}': {e}"
             )
+            if attempt < max(1, api_retries) - 1:
+                wait = 60.0 if ("429" in str(e) or "rate" in str(e).lower()) else 5.0
+                await asyncio.sleep(wait)
 
     paper.update(
         {
@@ -789,7 +507,7 @@ def rate_papers(papers: list, interests: Optional[str] = None) -> list:
     - `AZURE_API_KEY`（或 `OPENAI_API_KEY`）
     - 可选：`AZURE_ENDPOINT` / `AZURE_MODEL_NAME` / `AZURE_QPM` 等
     """
-    interests = interests or DEFAULT_INTERESTS
+    interests = interests or ""
     logging.info(f"开始对 {len(papers)} 篇论文做粗筛与评分...")
 
     # 若没有配置 key，直接回退到启发式，避免主流程崩溃。
@@ -816,5 +534,5 @@ if __name__ == '__main__':
             "summary": "We introduce ReAct, a paradigm that combines reasoning traces and task-specific actions to improve LLM agents...",
         }
     ]
-    rated = rate_papers(test_papers, interests=DEFAULT_INTERESTS)
+    rated = rate_papers(test_papers, interests="")
     print(json.dumps(rated[0], ensure_ascii=False, indent=2))

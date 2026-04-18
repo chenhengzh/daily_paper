@@ -6,8 +6,8 @@
   <div class="config-header">
     <h2>个人配置</h2>
     <div class="config-actions">
+      <span id="autoSaveStatus" style="font-size:12px;color:var(--text3)"></span>
       <button class="btn btn-secondary" onclick="resetToDefaults()">重置默认</button>
-      <button class="btn btn-primary" onclick="saveConfig()">保存</button>
     </div>
   </div>
 
@@ -29,6 +29,25 @@
         {% endfor %}
       </div>
       <button type="button" class="btn btn-secondary btn-sm" onclick="addInterestItem()">+ 添加方向</button>
+    </section>
+
+    <!-- 定时触发 -->
+    <section class="config-section">
+      <h3>定时触发</h3>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+          <input type="checkbox" id="auto_trigger" style="width:auto;accent-color:var(--accent)"
+            {% if config.auto_trigger %}checked{% endif %}>
+          开启定时触发
+        </label>
+        <div style="display:flex;align-items:center;gap:6px;font-size:13px">
+          <label>触发时间</label>
+          <input type="number" id="trigger_hour" value="{{ config.trigger_hour }}" min="0" max="23" style="width:56px;text-align:center">
+          <span>:</span>
+          <input type="number" id="trigger_minute" value="{{ config.trigger_minute }}" min="0" max="59" style="width:56px;text-align:center">
+          <span style="color:var(--text3)">（24小时制，工作日每天）</span>
+        </div>
+      </div>
     </section>
 
     <!-- arXiv 搜索 -->
@@ -59,6 +78,10 @@
               <textarea id="high_signal_keywords" rows="8">{{ config.high_signal_keywords | join('\n') }}</textarea>
             </div>
             <div class="form-group">
+              <label>降权关键词（每行一个，命中降分）</label>
+              <textarea id="deemphasized_keywords" rows="8">{{ config.deemphasized_keywords | join('\n') }}</textarea>
+            </div>
+            <div class="form-group">
               <label>重点关注作者（每行一个全名）</label>
               <textarea id="notable_authors" rows="8">{{ config.notable_authors | join('\n') }}</textarea>
             </div>
@@ -86,7 +109,7 @@
               </div>
               <div class="form-group">
                 <label>Model</label>
-                <input type="text" id="llm_model" value="{{ config.llm_model }}" placeholder="deepseek-v3.2-huawei">
+                <input type="text" id="llm_model" value="{{ config.llm_model }}" placeholder="deepseek-v3.2">
               </div>
             </div>
           </div>
@@ -105,9 +128,17 @@
 
 {% block scripts %}
 <script>
+let _saveTimer = null;
+
+function _scheduleAutoSave() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveConfig, 800);
+}
+
 function togglePrivateApi() {
-  const checked = document.getElementById('use_private_api').checked;
-  document.getElementById('privateApiFields').style.display = checked ? 'block' : 'none';
+  document.getElementById('privateApiFields').style.display =
+    document.getElementById('use_private_api').checked ? 'block' : 'none';
+  _scheduleAutoSave();
 }
 
 function getLines(id) {
@@ -115,9 +146,8 @@ function getLines(id) {
 }
 
 function getInterestItems() {
-  const items = document.querySelectorAll('#interestItems .interest-item');
   const result = [];
-  for (const item of items) {
+  for (const item of document.querySelectorAll('#interestItems .interest-item')) {
     const name = item.querySelector('.ii-name').value.trim();
     const desc = item.querySelector('.ii-desc').value.trim();
     if (name) result.push({name, description: desc});
@@ -131,14 +161,17 @@ function addInterestItem(name='', desc='') {
   div.className = 'interest-item';
   div.style.cssText = 'display:flex;gap:8px;align-items:center';
   div.innerHTML = `
-    <input type="text" class="ii-name" value="${esc(name)}" placeholder="方向名称" style="width:160px;flex-shrink:0">
-    <input type="text" class="ii-desc" value="${esc(desc)}" placeholder="描述这个研究方向的关注点...">
+    <input type="text" class="ii-name" value="${esc(name)}" placeholder="方向名称" style="width:160px;flex-shrink:0" oninput="_scheduleAutoSave()">
+    <input type="text" class="ii-desc" value="${esc(desc)}" placeholder="描述这个研究方向的关注点..." oninput="_scheduleAutoSave()">
     <button type="button" class="btn-icon btn-del" onclick="delInterestItem(this)">✕</button>`;
   container.appendChild(div);
   div.querySelector('.ii-name').focus();
 }
 
-function delInterestItem(btn) { btn.closest('.interest-item').remove(); }
+function delInterestItem(btn) {
+  btn.closest('.interest-item').remove();
+  _scheduleAutoSave();
+}
 
 async function saveConfig() {
   const payload = {
@@ -146,19 +179,34 @@ async function saveConfig() {
     categories: getLines('categories'),
     interest_table: getInterestItems(),
     high_signal_keywords: getLines('high_signal_keywords'),
+    deemphasized_keywords: getLines('deemphasized_keywords'),
     notable_authors: getLines('notable_authors'),
     llm_api_key: document.getElementById('use_private_api').checked ? (document.getElementById('llm_api_key').value.trim() || null) : null,
     llm_endpoint: document.getElementById('use_private_api').checked ? (document.getElementById('llm_endpoint').value.trim() || null) : null,
     llm_model: document.getElementById('use_private_api').checked ? (document.getElementById('llm_model').value.trim() || null) : null,
     max_results: parseInt(document.getElementById('max_results').value) || 800,
+    auto_trigger: document.getElementById('auto_trigger').checked,
+    trigger_hour: parseInt(document.getElementById('trigger_hour').value) || 9,
+    trigger_minute: parseInt(document.getElementById('trigger_minute').value) || 30,
   };
+  const status = document.getElementById('autoSaveStatus');
   try {
+    status.textContent = '保存中...';
     const res = await fetch('/config/api', {
       method: 'PUT', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(payload)
     });
-    showMsg(res.ok ? '配置已保存！' : '保存失败：' + res.statusText, res.ok ? 'success' : 'error');
-  } catch(e) { showMsg('保存失败：' + e.message, 'error'); }
+    if (res.ok) {
+      status.textContent = '已自动保存';
+      setTimeout(() => { status.textContent = ''; }, 2000);
+    } else {
+      status.textContent = '保存失败';
+      showMsg('保存失败：' + res.statusText, 'error');
+    }
+  } catch(e) {
+    status.textContent = '保存失败';
+    showMsg('保存失败：' + e.message, 'error');
+  }
 }
 
 async function resetToDefaults() {
@@ -169,16 +217,16 @@ async function resetToDefaults() {
     document.getElementById('keywords').value = (d.keywords || []).join('\n');
     document.getElementById('categories').value = (d.categories || []).join('\n');
     document.getElementById('high_signal_keywords').value = (d.high_signal_keywords || []).join('\n');
+    document.getElementById('deemphasized_keywords').value = (d.deemphasized_keywords || []).join('\n');
     document.getElementById('notable_authors').value = (d.notable_authors || []).join('\n');
     document.getElementById('max_results').value = d.max_results || 800;
-    document.getElementById('high_priority_target').value = d.high_priority_target || 15;
     const container = document.getElementById('interestItems');
     container.innerHTML = '';
     for (const item of (d.interest_table || [])) {
-      const name = item.name || item.field || '';
-      addInterestItem(name, item.description || '');
+      addInterestItem(item.name || item.field || '', item.description || '');
     }
-    showMsg('已重置，请点击保存。', 'info');
+    await saveConfig();
+    showMsg('已重置为默认配置', 'success');
   } catch(e) { showMsg('重置失败：' + e.message, 'error'); }
 }
 
@@ -191,5 +239,19 @@ function showMsg(msg, type) {
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// 绑定所有输入的自动保存
+document.addEventListener('DOMContentLoaded', () => {
+  const ids = ['keywords','categories','high_signal_keywords','deemphasized_keywords','notable_authors',
+               'llm_api_key','llm_endpoint','llm_model','max_results',
+               'auto_trigger','trigger_hour','trigger_minute'];
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', _scheduleAutoSave);
+    if (el && (el.type === 'checkbox' || el.type === 'number')) {
+      el.addEventListener('change', _scheduleAutoSave);
+    }
+  }
+});
 </script>
 {% endblock %}

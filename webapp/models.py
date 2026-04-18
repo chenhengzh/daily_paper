@@ -16,6 +16,8 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(256), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    user_type: Mapped[str] = mapped_column(String(16), default="external", nullable=False)  # internal | external
+    used_invite_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -37,6 +39,7 @@ class UserConfig(Base):
     interest_table_json: Mapped[str] = mapped_column(Text, default="[]")
     high_signal_keywords_json: Mapped[str] = mapped_column(Text, default="[]")
     low_signal_keywords_json: Mapped[str] = mapped_column(Text, default="[]")
+    deemphasized_keywords_json: Mapped[str] = mapped_column(Text, default="[]")
     notable_authors_json: Mapped[str] = mapped_column(Text, default="[]")
 
     llm_api_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
@@ -45,6 +48,9 @@ class UserConfig(Base):
 
     max_results: Mapped[int] = mapped_column(Integer, default=800)
     high_priority_target: Mapped[int] = mapped_column(Integer, default=15)
+    auto_trigger: Mapped[bool] = mapped_column(Boolean, default=True)
+    trigger_hour: Mapped[int] = mapped_column(Integer, default=9)
+    trigger_minute: Mapped[int] = mapped_column(Integer, default=30)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user: Mapped["User"] = relationship("User", back_populates="config")
@@ -89,6 +95,8 @@ class DailyJob(Base):
     daily_summary_zh: Mapped[str | None] = mapped_column(Text, nullable=True)
     daily_ideas_zh: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_msg: Mapped[str | None] = mapped_column(Text, nullable=True)
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -115,6 +123,7 @@ class UserPaperResult(Base):
     interest_match_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     tldr: Mapped[str | None] = mapped_column(Text, nullable=True)
     tldr_zh: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary_zh: Mapped[str | None] = mapped_column(Text, nullable=True)
     tags_json: Mapped[str] = mapped_column(Text, default="[]")
 
     relevance_score: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -143,6 +152,18 @@ class UserPaperResult(Base):
         UniqueConstraint("user_id", "paper_id", name="uq_user_paper"),
         Index("ix_user_paper_results_user_date", "user_id"),
     )
+
+
+class InviteCode(Base):
+    __tablename__ = "invite_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(32), unique=True, nullable=False, index=True)
+    code_type: Mapped[str] = mapped_column(String(16), default="internal", nullable=False)  # internal | external
+    created_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    used_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class ChatMessage(Base):
