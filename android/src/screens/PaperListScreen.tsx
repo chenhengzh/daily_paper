@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet, Pressable,
-  ActivityIndicator, Modal, TouchableOpacity,
+  ActivityIndicator, Modal, TouchableOpacity, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -14,6 +14,21 @@ import { Paper } from '../types/paper';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Main'>;
 
+function JobStatusBadge({ job, colors }: { job: any; colors: any }) {
+  if (!job) return null;
+  const statusMap: Record<string, { label: string; color: string }> = {
+    pending: { label: '等待中', color: colors.text3 },
+    scraping: { label: '抓取中...', color: colors.amber },
+    rating: { label: `评分中 ${job.rated_count ?? 0}/${job.scrape_count ?? 0}`, color: colors.accent },
+    done: { label: '完成', color: colors.green },
+    failed: { label: '失败', color: colors.red },
+  };
+  const s = statusMap[job.status] ?? { label: job.status, color: colors.text3 };
+  return (
+    <Text style={[styles.jobStatus, { color: s.color }]}>{s.label}</Text>
+  );
+}
+
 export function PaperListScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const {
@@ -21,10 +36,12 @@ export function PaperListScreen({ navigation }: Props) {
     filteredPapers, fields, activeField, setActiveField,
     viewMode, setViewMode,
     allPapers, job,
+    searchQuery, setSearchQuery,
     loading, error, refresh,
   } = usePapers();
 
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   const keptCount = allPapers.filter(p => p.keep).length;
   const hpCount = allPapers.filter(p => p.high_priority).length;
@@ -48,22 +65,55 @@ export function PaperListScreen({ navigation }: Props) {
             </Text>
           </Pressable>
           <Pressable
+            onPress={() => setShowSearch(v => !v)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={[styles.iconBtn, { color: showSearch ? colors.accent : colors.text3 }]}>🔍</Text>
+          </Pressable>
+          <Pressable
             onPress={() => navigation.push('Settings')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={[styles.settingsIcon, { color: colors.text3 }]}>⚙</Text>
+            <Text style={[styles.iconBtn, { color: colors.text3 }]}>⚙</Text>
           </Pressable>
         </View>
       </View>
 
-      {/* Stats row */}
-      {allPapers.length > 0 && (
-        <View style={[styles.statsRow, { backgroundColor: colors.bg2 }]}>
-          <Text style={[styles.stat, { color: colors.text3 }]}>总计 <Text style={{ color: colors.text }}>{allPapers.length}</Text></Text>
-          <Text style={[styles.stat, { color: colors.text3 }]}>精选 <Text style={{ color: colors.green }}>{keptCount}</Text></Text>
-          <Text style={[styles.stat, { color: colors.text3 }]}>高优 <Text style={{ color: colors.amber }}>{hpCount}</Text></Text>
+      {/* Search bar */}
+      {showSearch && (
+        <View style={[styles.searchRow, { backgroundColor: colors.bg2, borderBottomColor: colors.border }]}>
+          <TextInput
+            style={[styles.searchInput, { backgroundColor: colors.bgInput, borderColor: colors.border, color: colors.text }]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="搜索标题、摘要..."
+            placeholderTextColor={colors.text3}
+            autoFocus
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
         </View>
       )}
+
+      {/* Stats + job status row */}
+      <View style={[styles.statsRow, { backgroundColor: colors.bg2 }]}>
+        <Text style={[styles.stat, { color: colors.text3 }]}>
+          总 <Text style={{ color: colors.text }}>{allPapers.length}</Text>
+        </Text>
+        <Text style={[styles.stat, { color: colors.text3 }]}>
+          精选 <Text style={{ color: colors.green }}>{keptCount}</Text>
+        </Text>
+        <Text style={[styles.stat, { color: colors.text3 }]}>
+          高优 <Text style={{ color: colors.amber }}>{hpCount}</Text>
+        </Text>
+        {searchQuery ? (
+          <Text style={[styles.stat, { color: colors.text3 }]}>
+            结果 <Text style={{ color: colors.accent }}>{filteredPapers.length}</Text>
+          </Text>
+        ) : null}
+        <View style={{ flex: 1 }} />
+        <JobStatusBadge job={job} colors={colors} />
+      </View>
 
       {/* Filter bar */}
       <FilterBar
@@ -101,8 +151,15 @@ export function PaperListScreen({ navigation }: Props) {
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           ListEmptyComponent={
-            <View style={styles.center}>
-              <Text style={[styles.emptyText, { color: colors.text3 }]}>暂无论文</Text>
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, { color: colors.text3 }]}>
+                {searchQuery ? `"${searchQuery}" 无匹配结果` : '暂无论文'}
+              </Text>
+              {searchQuery ? (
+                <Pressable onPress={() => setSearchQuery('')}>
+                  <Text style={{ color: colors.accent, marginTop: 8 }}>清除搜索</Text>
+                </Pressable>
+              ) : null}
             </View>
           }
           initialNumToRender={8}
@@ -166,7 +223,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   brand: { fontSize: 17, fontWeight: '700' },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   datePill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -174,18 +231,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   datePillText: { fontSize: 13, fontWeight: '500' },
-  settingsIcon: { fontSize: 20 },
+  iconBtn: { fontSize: 18 },
+  searchRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  searchInput: {
+    height: 38,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    fontSize: 14,
+  },
   statsRow: {
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
+    gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 6,
   },
   stat: { fontSize: 12 },
+  jobStatus: { fontSize: 11, fontWeight: '500' },
   list: { paddingHorizontal: 16, paddingBottom: 24, paddingTop: 4 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
   loadingText: { fontSize: 14 },
   errorText: { fontSize: 14, textAlign: 'center' },
+  emptyContainer: { alignItems: 'center', paddingTop: 60 },
   emptyText: { fontSize: 14 },
   retryBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 },
   modalOverlay: {
