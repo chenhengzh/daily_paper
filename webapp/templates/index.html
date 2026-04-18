@@ -1,24 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Daily Paper{% endblock %}
 
-{% block nav %}
-<nav class="navbar">
-  <div class="nav-brand">
-    <a href="/papers">Daily Paper</a>
-  </div>
-  <div class="nav-links">
-    <a href="/papers" class="{% if request.url.path.startswith('/papers') %}active{% endif %}">论文</a>
-    <a href="/config" class="{% if request.url.path.startswith('/config') %}active{% endif %}">配置</a>
-    <div id="triggerProgress" style="display:none;font-size:12px;color:var(--text3);margin:0 8px"></div>
-    <button class="btn-icon" id="themeToggle" onclick="toggleTheme()" title="切换主题" style="font-size:16px;padding:2px 6px">☀</button>
-    <span class="nav-user">{{ user.username }}</span>
-    <form action="/auth/logout" method="post" style="display:inline">
-      <button type="submit" class="btn-link">注销</button>
-    </form>
-  </div>
-</nav>
-{% endblock %}
-
 {% block content %}
 <div class="page-layout" id="pageLayout">
 
@@ -62,6 +44,7 @@
           <div id="jobStatus" class="job-status" style="flex:1"></div>
           <button class="btn btn-secondary btn-sm" id="triggerBtn" onclick="triggerJob()">触发</button>
         </div>
+        <div id="triggerProgress" style="display:none;margin-top:8px;font-size:11px;color:var(--text3)"></div>
       </div>
     </div>
   </aside>
