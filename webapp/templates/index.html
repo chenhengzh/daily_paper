@@ -119,6 +119,15 @@ async function init() {
   restorePanelWidths();
   await loadPapers(TARGET_DATE);
   await loadSummary(TARGET_DATE);
+  // Reconnect to any in-progress trigger job
+  try {
+    const st = await (await fetch('/papers/trigger/status')).json();
+    if (st.running) {
+      _setTriggerRunning(true);
+      document.getElementById('triggerProgress').textContent = '后台任务进行中...';
+      _readTriggerProgress();
+    }
+  } catch(e) {}
 }
 
 // ── 数据加载 ────────────────────────────────────────────────────────────────

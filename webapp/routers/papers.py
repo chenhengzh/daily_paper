@@ -298,6 +298,15 @@ async def trigger_job(
     return {"status": "triggered", "user": user.username}
 
 
+@router.get("/trigger/status", response_class=JSONResponse)
+async def trigger_status(request: Request, db: Session = Depends(get_db)):
+    """Return whether a trigger job is currently running for the user."""
+    user = _current_user_dep(request, db)
+    user_id = user.id
+    running = user_id in _trigger_progress and not _trigger_done.get(user_id, True)
+    return {"running": running}
+
+
 @router.get("/trigger/progress")
 async def trigger_progress(request: Request, db: Session = Depends(get_db)):
     """SSE stream of trigger progress events for the current user."""
