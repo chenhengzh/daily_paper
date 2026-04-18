@@ -499,17 +499,15 @@ async function _readTriggerProgress() {
           } else if (evt.type === 'done_date') {
             datesProcessed++;
             prog.innerHTML = `<span class="pulse-dot"></span> 完成 ${evt.date}，已处理 ${datesProcessed} 天`;
+            await _refreshDateSelect();
+            await loadPapers(TARGET_DATE);
+            await loadSummary(TARGET_DATE);
           } else if (evt.type === 'skip') {
             prog.innerHTML = `<span class="pulse-dot"></span> 跳过 ${evt.date}（无数据）`;
           } else if (evt.type === 'all_done') {
             prog.innerHTML = `✓ 全部完成，共处理 ${evt.processed} 天`;
             _setTriggerRunning(false);
-            setTimeout(async () => {
-              prog.style.display = 'none';
-              await _refreshDateSelect();
-              await loadPapers(TARGET_DATE);
-              await loadSummary(TARGET_DATE);
-            }, 1500);
+            setTimeout(() => { prog.style.display = 'none'; }, 2000);
             return;
           } else if (evt.type === 'error') {
             prog.innerHTML = `<span style="color:var(--red)">错误: ${escHtml(evt.message)}</span>`;
