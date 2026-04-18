@@ -73,32 +73,32 @@ async def register(
     db.add(user)
     db.flush()
 
-    from src.scraper import DEFAULT_CATEGORIES, DEFAULT_KEYWORDS
-    from src.filter import HIGH_SIGNAL_KEYWORDS, NOTABLE_AUTHORS, INTEREST_TABLE, DEFAULT_ARXIV_KEYWORDS
-
-    # Convert INTEREST_TABLE (field/subfield/description) to {name, description} format
-    # Group by field, merge subfield descriptions
-    _seen_fields: dict = {}
-    for row in INTEREST_TABLE:
-        f = row["field"]
-        desc = f"{row['subfield']}: {row['description']}"
-        if f not in _seen_fields:
-            _seen_fields[f] = []
-        _seen_fields[f].append(desc)
-    _interest_table = [
-        {"name": f, "description": " | ".join(descs)}
-        for f, descs in _seen_fields.items()
+    _DEFAULT_KEYWORDS = ["LLM", "Agent", "Reinforcement Learning", "Tool Use"]
+    _DEFAULT_CATEGORIES = ["cs.AI", "cs.LG", "cs.CL"]
+    _DEFAULT_INTEREST_TABLE = [
+        {"name": "LLM", "description": "Large language model training, alignment, RLHF, reasoning, scaling, and inference optimization."},
+        {"name": "Agent", "description": "LLM-based agents, tool use, multi-agent systems, agentic workflows, and test-time compute scaling."},
+    ]
+    _DEFAULT_HIGH_SIGNAL = ["reinforcement learning", "policy optimization", "self-play", "agent", "tool use", "memory"]
+    _DEFAULT_NOTABLE_AUTHORS = [
+        "Andrej Karpathy", "Chelsea Finn", "David Silver", "Denny Zhou",
+        "Doina Precup", "Geoffrey Hinton", "Ilya Sutskever", "John Schulman",
+        "Noam Shazeer", "Percy Liang", "Pieter Abbeel", "Richard S. Sutton",
+        "Richard Sutton", "Satinder Singh", "Sergey Levine", "Shane Legg",
+        "Yann LeCun", "Yarin Gal", "Yoshua Bengio",
     ]
 
     config = UserConfig(
         user_id=user.id,
-        keywords_json=json.dumps(DEFAULT_ARXIV_KEYWORDS, ensure_ascii=False),
-        categories_json=json.dumps(DEFAULT_CATEGORIES, ensure_ascii=False),
+        keywords_json=json.dumps(_DEFAULT_KEYWORDS, ensure_ascii=False),
+        categories_json=json.dumps(_DEFAULT_CATEGORIES, ensure_ascii=False),
         interests_text="",
-        interest_table_json=json.dumps(_interest_table, ensure_ascii=False),
-        high_signal_keywords_json=json.dumps(HIGH_SIGNAL_KEYWORDS, ensure_ascii=False),
+        interest_table_json=json.dumps(_DEFAULT_INTEREST_TABLE, ensure_ascii=False),
+        high_signal_keywords_json=json.dumps(_DEFAULT_HIGH_SIGNAL, ensure_ascii=False),
         low_signal_keywords_json=json.dumps([], ensure_ascii=False),
-        notable_authors_json=json.dumps(sorted(NOTABLE_AUTHORS), ensure_ascii=False),
+        notable_authors_json=json.dumps(_DEFAULT_NOTABLE_AUTHORS, ensure_ascii=False),
+        max_results=800,
+        high_priority_target=15,
     )
     db.add(config)
     db.commit()
