@@ -320,8 +320,7 @@ body.dark .subfield-tag { background: rgba(59,130,246,0.1); color: #93c5fd; bord
 .detail-body {
   overflow-y: auto; padding: 14px;
   display: flex; flex-direction: column; gap: 10px;
-  max-height: 240px; flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
+  flex: 1; min-height: 0;
 }
 .detail-title { font-size: 15px; font-weight: 700; line-height: 1.4; color: var(--text); }
 .detail-meta { display: flex; gap: 8px; font-size: 11px; color: var(--text3); flex-wrap: wrap; align-items: center; }
