@@ -262,7 +262,7 @@ async def trigger_job(
 
             async def _run_all():
                 processed = 0
-                for i in range(10):
+                for i in range(5):
                     d = today - timedelta(days=i)
                     _push({"type": "scraping", "date": d.isoformat(), "step": i + 1})
                     logger.info(f"[trigger] 抓取 {d}")

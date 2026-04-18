@@ -471,10 +471,8 @@ function renderJobStatus(job) {
 
 function _setTriggerRunning(running) {
   const btn = document.getElementById('triggerBtn');
-  const sel = document.getElementById('dateSelect');
   btn.disabled = running;
   btn.textContent = running ? '运行中...' : '触发';
-  if (sel) sel.disabled = running;
 }
 
 async function _readTriggerProgress() {
@@ -497,7 +495,7 @@ async function _readTriggerProgress() {
         try {
           const evt = JSON.parse(line.slice(6));
           if (evt.type === 'scraping') {
-            prog.innerHTML = `<span class="pulse-dot"></span> 抓取 ${evt.date} (${evt.step}/10)`;
+            prog.innerHTML = `<span class="pulse-dot"></span> 抓取 ${evt.date} (${evt.step}/5)`;
           } else if (evt.type === 'rating') {
             prog.innerHTML = `<span class="pulse-dot"></span> 评分 ${evt.date} (${evt.count} 篇)`;
           } else if (evt.type === 'done_date') {
@@ -524,7 +522,7 @@ async function _readTriggerProgress() {
 }
 
 async function triggerJob() {
-  if (!confirm('触发论文抓取与评分（将处理最近 10 天数据）？')) return;
+  if (!confirm('触发论文抓取与评分（将处理最近 5 天数据）？')) return;
   _setTriggerRunning(true);
   document.getElementById('triggerProgress').textContent = '正在启动...';
   try {
