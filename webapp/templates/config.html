@@ -70,19 +70,28 @@
         </section>
 
         <section>
-          <h3 style="font-size:13px;margin-bottom:10px">LLM API 覆盖（留空使用系统默认）</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>API Key</label>
-              <input type="password" id="llm_api_key" value="{{ config.llm_api_key }}" placeholder="留空使用系统默认">
-            </div>
-            <div class="form-group">
-              <label>Endpoint</label>
-              <input type="text" id="llm_endpoint" value="{{ config.llm_endpoint }}" placeholder="https://...">
-            </div>
-            <div class="form-group">
-              <label>Model</label>
-              <input type="text" id="llm_model" value="{{ config.llm_model }}" placeholder="deepseek-v3.2-huawei">
+          <div class="form-group" style="margin-bottom:12px">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)">
+              <input type="checkbox" id="use_private_api" onchange="togglePrivateApi()"
+                {% if config.llm_api_key %}checked{% endif %}
+                style="width:auto;accent-color:var(--accent)">
+              使用私人 LLM API
+            </label>
+          </div>
+          <div id="privateApiFields" style="display:{% if config.llm_api_key %}block{% else %}none{% endif %}">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>API Key</label>
+                <input type="password" id="llm_api_key" value="{{ config.llm_api_key }}" placeholder="sk-...">
+              </div>
+              <div class="form-group">
+                <label>Endpoint</label>
+                <input type="text" id="llm_endpoint" value="{{ config.llm_endpoint }}" placeholder="https://...">
+              </div>
+              <div class="form-group">
+                <label>Model</label>
+                <input type="text" id="llm_model" value="{{ config.llm_model }}" placeholder="deepseek-v3.2-huawei">
+              </div>
             </div>
           </div>
           <div class="form-group" style="max-width:200px">
@@ -100,6 +109,11 @@
 
 {% block scripts %}
 <script>
+function togglePrivateApi() {
+  const checked = document.getElementById('use_private_api').checked;
+  document.getElementById('privateApiFields').style.display = checked ? 'block' : 'none';
+}
+
 function getLines(id) {
   return document.getElementById(id).value.split('\n').map(s => s.trim()).filter(Boolean);
 }
@@ -137,9 +151,9 @@ async function saveConfig() {
     interest_table: getInterestItems(),
     high_signal_keywords: getLines('high_signal_keywords'),
     notable_authors: getLines('notable_authors'),
-    llm_api_key: document.getElementById('llm_api_key').value.trim() || null,
-    llm_endpoint: document.getElementById('llm_endpoint').value.trim() || null,
-    llm_model: document.getElementById('llm_model').value.trim() || null,
+    llm_api_key: document.getElementById('use_private_api').checked ? (document.getElementById('llm_api_key').value.trim() || null) : null,
+    llm_endpoint: document.getElementById('use_private_api').checked ? (document.getElementById('llm_endpoint').value.trim() || null) : null,
+    llm_model: document.getElementById('use_private_api').checked ? (document.getElementById('llm_model').value.trim() || null) : null,
     max_results: parseInt(document.getElementById('max_results').value) || 800,
     high_priority_target: parseInt(document.getElementById('high_priority_target').value) || 15,
   };

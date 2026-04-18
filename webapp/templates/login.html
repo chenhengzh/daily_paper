@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% if mode == 'register' %}注册{% else %}登录{% endif %} - Daily Paper</title>
   <link rel="stylesheet" href="/static/style.css">
+  <script>(function(){ if(localStorage.getItem('dp_theme')==='dark') document.write('<style>body{}</style>'); })();</script>
 </head>
 <body class="auth-page">
+  <script>if(localStorage.getItem('dp_theme')==='dark') document.body.classList.add('dark');</script>
   <div class="auth-container">
     <div class="auth-card">
       <h1>📄 Daily Paper</h1>

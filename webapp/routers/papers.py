@@ -22,6 +22,10 @@ router = APIRouter()
 _TMPL_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates")
 templates = Jinja2Templates(directory=_TMPL_DIR)
 
+# In-memory progress store: user_id -> list of progress event dicts
+_trigger_progress: dict[int, list] = {}
+_trigger_done: dict[int, bool] = {}
+
 
 def _tmpl(request, name, ctx=None, **kwargs):
     ctx = ctx or {}
@@ -238,6 +242,13 @@ async def trigger_job(
     force = bool(body.get("force", False))
     user_id = user.id
 
+    # Reset progress for this user
+    _trigger_progress[user_id] = []
+    _trigger_done[user_id] = False
+
+    def _push(event: dict):
+        _trigger_progress.setdefault(user_id, []).append(event)
+
     def _run_in_thread():
         logger = logging.getLogger("trigger")
         try:
@@ -250,11 +261,12 @@ async def trigger_job(
             today = _date.today()
 
             async def _run_all():
+                processed = 0
                 for i in range(10):
                     d = today - timedelta(days=i)
-                    logger.info(f"[trigger] 处理 {d}")
+                    _push({"type": "scraping", "date": d.isoformat(), "step": i + 1})
+                    logger.info(f"[trigger] 抓取 {d}")
                     raw = scrape_and_store(d)
-                    # check if papers exist in db for this date
                     from webapp.database import SessionLocal as _SL
                     from webapp.models import Paper as _Paper
                     _db = _SL()
@@ -263,19 +275,53 @@ async def trigger_job(
                     finally:
                         _db.close()
                     if raw or has_papers:
+                        _push({"type": "rating", "date": d.isoformat(), "count": len(raw) if raw else 0})
                         await rate_papers_for_user(user_id, d, force=force)
+                        _push({"type": "done_date", "date": d.isoformat()})
+                        processed += 1
                     else:
-                        logger.info(f"[trigger] {d} 无论文数据，跳过")
+                        _push({"type": "skip", "date": d.isoformat()})
+                        logger.info(f"[trigger] {d} 无数据，跳过")
+                _push({"type": "all_done", "processed": processed})
 
             asyncio.run(_run_all())
             logger.info(f"[trigger] 全部完成 user_id={user_id}")
         except Exception as e:
             logger.exception(f"[trigger] 任务失败: {e}")
+            _push({"type": "error", "message": str(e)})
+        finally:
+            _trigger_done[user_id] = True
 
     t = threading.Thread(target=_run_in_thread, daemon=True)
     t.start()
 
     return {"status": "triggered", "user": user.username}
+
+
+@router.get("/trigger/progress")
+async def trigger_progress(request: Request, db: Session = Depends(get_db)):
+    """SSE stream of trigger progress events for the current user."""
+    import asyncio as _asyncio
+
+    user = _current_user_dep(request, db)
+    user_id = user.id
+
+    async def event_stream():
+        sent = 0
+        while True:
+            events = _trigger_progress.get(user_id, [])
+            while sent < len(events):
+                evt = events[sent]
+                yield f"data: {json.dumps(evt, ensure_ascii=False)}\n\n"
+                sent += 1
+                if evt.get("type") in ("all_done", "error"):
+                    return
+            if _trigger_done.get(user_id) and sent >= len(_trigger_progress.get(user_id, [])):
+                yield f"data: {json.dumps({'type': 'all_done', 'processed': 0})}\n\n"
+                return
+            await _asyncio.sleep(0.5)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @router.get("/{arxiv_id}/chat/history", response_class=JSONResponse)

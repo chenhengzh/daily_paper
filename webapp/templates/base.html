@@ -6,16 +6,25 @@
   <title>{% block title %}Daily Paper{% endblock %}</title>
   <link rel="stylesheet" href="/static/style.css">
   {% block head %}{% endblock %}
+  <script>
+    // Apply saved theme before paint to avoid flash
+    (function() {
+      if (localStorage.getItem('dp_theme') === 'dark') {
+        document.documentElement.classList.add('dark-pending');
+      }
+    })();
+  </script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
   {% block nav %}
   <nav class="navbar">
     <div class="nav-brand">
-      <a href="/papers">📄 Daily Paper</a>
+      <a href="/papers">Daily Paper</a>
     </div>
     <div class="nav-links">
       <a href="/papers" class="{% if request.url.path.startswith('/papers') %}active{% endif %}">论文</a>
       <a href="/config" class="{% if request.url.path.startswith('/config') %}active{% endif %}">配置</a>
+      <button class="btn-icon" id="themeToggle" onclick="toggleTheme()" title="切换主题" style="font-size:16px;padding:2px 6px">☀</button>
       <span class="nav-user">{{ user.username }}</span>
       <form action="/auth/logout" method="post" style="display:inline">
         <button type="submit" class="btn-link">注销</button>
@@ -27,6 +36,21 @@
   <main>
     {% block content %}{% endblock %}
   </main>
+
+  <script>
+    function _applyTheme(dark) {
+      document.body.classList.toggle('dark', dark);
+      const btn = document.getElementById('themeToggle');
+      if (btn) btn.textContent = dark ? '☾' : '☀';
+    }
+    function toggleTheme() {
+      const isDark = document.body.classList.contains('dark');
+      localStorage.setItem('dp_theme', isDark ? 'light' : 'dark');
+      _applyTheme(!isDark);
+    }
+    // Apply theme on load
+    _applyTheme(localStorage.getItem('dp_theme') === 'dark');
+  </script>
 
   {% block scripts %}{% endblock %}
 </body>

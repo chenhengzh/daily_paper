@@ -14,9 +14,6 @@
           {% for d in dates %}
           <option value="{{ d }}" {% if d == target_date %}selected{% endif %}>{{ d }}</option>
           {% endfor %}
-          {% if target_date not in dates %}
-          <option value="{{ target_date }}" selected>{{ target_date }}</option>
-          {% endif %}
         </select>
       </div>
 
@@ -45,8 +42,9 @@
       <div class="filter-section">
         <div style="display:flex;gap:6px;align-items:center">
           <div id="jobStatus" class="job-status" style="flex:1"></div>
-          <button class="btn btn-secondary btn-sm" onclick="triggerJob()">触发</button>
+          <button class="btn btn-secondary btn-sm" id="triggerBtn" onclick="triggerJob()">触发</button>
         </div>
+        <div id="triggerProgress" style="display:none;margin-top:8px;font-size:11px;color:var(--text3)"></div>
       </div>
     </div>
   </aside>
@@ -472,17 +470,64 @@ function renderJobStatus(job) {
 }
 
 async function triggerJob() {
-  const d = document.getElementById('dateSelect').value || TARGET_DATE;
-  if (!confirm(`触发 ${d} 的论文任务？`)) return;
+  if (!confirm('触发论文抓取与评分（将处理最近 10 天数据）？')) return;
+  const btn = document.getElementById('triggerBtn');
+  const prog = document.getElementById('triggerProgress');
+  btn.disabled = true;
+  btn.textContent = '运行中...';
+  prog.style.display = 'block';
+  prog.textContent = '正在启动...';
+
   try {
     await fetch('/papers/trigger', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({date: d, force: false})
+      body: JSON.stringify({force: false})
     });
-    alert('任务已触发，请稍后刷新页面。');
+
+    // Stream progress via SSE
+    const res = await fetch('/papers/trigger/progress');
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let datesProcessed = 0;
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, {stream: true});
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const evt = JSON.parse(line.slice(6));
+          if (evt.type === 'scraping') {
+            prog.innerHTML = `<span class="pulse-dot"></span> 抓取 ${evt.date} (${evt.step}/10)`;
+          } else if (evt.type === 'rating') {
+            prog.innerHTML = `<span class="pulse-dot"></span> 评分 ${evt.date} (${evt.count} 篇)`;
+          } else if (evt.type === 'done_date') {
+            datesProcessed++;
+            prog.innerHTML = `<span class="pulse-dot"></span> 完成 ${evt.date}，已处理 ${datesProcessed} 天`;
+          } else if (evt.type === 'skip') {
+            prog.innerHTML = `<span class="pulse-dot"></span> 跳过 ${evt.date}（无数据）`;
+          } else if (evt.type === 'all_done') {
+            prog.innerHTML = `✓ 全部完成，共处理 ${evt.processed} 天`;
+            setTimeout(() => {
+              prog.style.display = 'none';
+              window.location.reload();
+            }, 1500);
+            return;
+          } else if (evt.type === 'error') {
+            prog.innerHTML = `<span style="color:var(--red)">错误: ${escHtml(evt.message)}</span>`;
+          }
+        } catch(e) {}
+      }
+    }
   } catch(e) {
-    alert('触发失败: ' + e.message);
+    prog.innerHTML = `<span style="color:var(--red)">触发失败: ${escHtml(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '触发';
   }
 }
 
