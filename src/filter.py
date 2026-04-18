@@ -401,8 +401,6 @@ def _heuristic_fallback(papers: list, interests: str) -> list:
         p.setdefault("relevance_score", rel)
         p.setdefault("quality_score", 5)
         p.setdefault("novelty_claim_score", 5)
-        p.setdefault("clarity_score", 5)
-        p.setdefault("potential_impact_score", 5)
         p.setdefault("overall_priority_score", round((rel * 0.6 + 5 * 0.4), 1))
     return papers
 
@@ -488,8 +486,6 @@ Paper Abstract: %s
   "relevance_score": 1,
   "quality_score": 1,
   "novelty_claim_score": 1,
-  "clarity_score": 1,
-  "potential_impact_score": 1,
   "overall_priority_score": 1
 }
 
@@ -574,8 +570,7 @@ def _postprocess_one(p: Dict[str, Any]) -> Dict[str, Any]:
     p["relevance_score"] = _clamp_score(p.get("relevance_score", 0))
     p["quality_score"] = _clamp_score(p.get("quality_score", 0))
     p["novelty_claim_score"] = _clamp_score(p.get("novelty_claim_score", 0))
-    p["clarity_score"] = _clamp_score(p.get("clarity_score", 0))
-    p["potential_impact_score"] = _clamp_score(p.get("potential_impact_score", 0))
+
     p["overall_priority_score"] = _clamp_score(p.get("overall_priority_score", 0))
 
     text = _text_for_match(p)
@@ -706,8 +701,6 @@ async def _rate_one_paper(
                 "relevance_score": 0,
                 "quality_score": 0,
                 "novelty_claim_score": 0,
-                "clarity_score": 0,
-                "potential_impact_score": 0,
                 "tldr": "",
                 "tldr_zh": "",
                 "tags": [],

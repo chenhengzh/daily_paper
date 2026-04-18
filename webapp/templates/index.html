@@ -295,8 +295,6 @@ function renderDetail(p) {
     ${scoreBar('相关性', p.relevance_score)}
     ${scoreBar('质量', p.quality_score)}
     ${scoreBar('新颖性', p.novelty_claim_score)}
-    ${scoreBar('清晰度', p.clarity_score)}
-    ${scoreBar('影响力', p.potential_impact_score)}
   </div>
   ${signals ? `<div><div class="detail-section-label">信号</div><div>${signals}</div></div>` : ''}
   ${!p.keep && p.keep_reason ? `<div><div class="detail-section-label">过滤原因</div><div class="keep-reason">${escHtml(p.keep_reason)}</div></div>` : ''}
