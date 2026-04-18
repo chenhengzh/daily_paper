@@ -43,10 +43,6 @@
           <label>arXiv 分类（每行一个）</label>
           <textarea id="categories" rows="5">{{ config.categories | join('\n') }}</textarea>
         </div>
-        <div class="form-group">
-          <label>高优精选目标数</label>
-          <input type="number" id="high_priority_target" value="{{ config.high_priority_target }}" min="5" max="50" style="width:80px">
-        </div>
       </div>
     </section>
 
@@ -155,7 +151,6 @@ async function saveConfig() {
     llm_endpoint: document.getElementById('use_private_api').checked ? (document.getElementById('llm_endpoint').value.trim() || null) : null,
     llm_model: document.getElementById('use_private_api').checked ? (document.getElementById('llm_model').value.trim() || null) : null,
     max_results: parseInt(document.getElementById('max_results').value) || 800,
-    high_priority_target: parseInt(document.getElementById('high_priority_target').value) || 15,
   };
   try {
     const res = await fetch('/config/api', {

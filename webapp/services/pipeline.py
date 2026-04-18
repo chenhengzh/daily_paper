@@ -186,7 +186,7 @@ async def rate_papers_for_user(
             filter_mod.LOW_SIGNAL_KEYWORDS = orig_low
 
         rated = _postprocess_scoring(rated)
-        rated = mark_high_priority(rated, target=hp_target)
+        rated = mark_high_priority(rated)
 
         # 生成当日总结
         daily_summary_zh = ""

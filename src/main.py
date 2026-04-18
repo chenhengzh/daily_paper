@@ -54,59 +54,37 @@ def _tier_label(overall: float, relevance: float, quality: float) -> str:
     return "C"
 
 
-def mark_high_priority(
-    papers: list[dict],
-    *,
-    target: int = 15,
-) -> list[dict]:
-    """将当日“高优精选”控制在 10-20（默认 15）。
-
-    策略：
-    - 先按 (overall, relevance, quality) 排序
-    - 只在 keep=true 范围内做 top-N
-    - 写回字段：high_priority / high_priority_rank / tier
-    """
-
-    target = int(target)
-    if target <= 0:
-        target = 15
-
-    # 先写回 tier（展示分层也依赖它）
+def mark_high_priority(papers: list[dict]) -> list[dict]:
+    “””将 tier S/A 的论文全部标为高优精选，按综合分排名。”””
     for p in papers:
-        overall = _score(p.get("overall_priority_score"), 0)
-        rel = _score(p.get("relevance_score"), 0)
-        qual = _score(p.get("quality_score"), 0)
-        p["tier"] = _tier_label(overall, rel, qual)
+        overall = _score(p.get(“overall_priority_score”), 0)
+        rel = _score(p.get(“relevance_score”), 0)
+        qual = _score(p.get(“quality_score”), 0)
+        p[“tier”] = _tier_label(overall, rel, qual)
 
-    kept = [p for p in papers if bool(p.get("keep", True))]
-
-    # 高优精选：只从 S/A 中挑选，避免出现 B 档仍进入“高优”造成认知错位。
-    hp_candidates = [p for p in kept if (p.get("tier") in ("S", "A"))]
-    hp_candidates.sort(
+    candidates = [p for p in papers if p.get(“keep”, True) and p.get(“tier”) in (“S”, “A”)]
+    candidates.sort(
         key=lambda x: (
-            _score(x.get("overall_priority_score"), 0),
-            _score(x.get("relevance_score"), 0),
-            _score(x.get("quality_score"), 0),
+            _score(x.get(“overall_priority_score”), 0),
+            _score(x.get(“relevance_score”), 0),
+            _score(x.get(“quality_score”), 0),
         ),
         reverse=True,
     )
 
-    top = hp_candidates[:target]
-    top_ids = set()
-    for i, p in enumerate(top):
-        pid = p.get("arxiv_id") or p.get("abs_url") or p.get("url") or p.get("title")
+    hp_ids = set()
+    for i, p in enumerate(candidates):
+        pid = p.get(“arxiv_id”) or p.get(“abs_url”) or p.get(“url”) or p.get(“title”)
         if pid:
-            top_ids.add(str(pid))
-        p["high_priority"] = True
-        p["high_priority_rank"] = i + 1
+            hp_ids.add(str(pid))
+        p[“high_priority”] = True
+        p[“high_priority_rank”] = i + 1
 
     for p in papers:
-        pid = p.get("arxiv_id") or p.get("abs_url") or p.get("url") or p.get("title")
-        if str(pid) in top_ids:
-            p.setdefault("high_priority", True)
-        else:
-            p["high_priority"] = False
-            p.pop("high_priority_rank", None)
+        pid = p.get(“arxiv_id”) or p.get(“abs_url”) or p.get(“url”) or p.get(“title”)
+        if str(pid) not in hp_ids:
+            p[“high_priority”] = False
+            p.pop(“high_priority_rank”, None)
 
     return papers
 
