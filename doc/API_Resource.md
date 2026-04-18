@@ -1,0 +1,17 @@
+
+## OPENAI_API
+
+BASEURL:
+https://aigc.sankuai.com/v1/openai/native
+
+APIKEY:
+1996846112510230606
+1996846092281004095
+1996846069497630754
+1996845986040123467
+
+MODEL:
+deepseek-v3.2-huawei
+glm-5
+MiniMax-M2.7
+

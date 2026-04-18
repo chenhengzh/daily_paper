@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Daily Paper{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  {% block nav %}
+  <nav class="navbar">
+    <div class="nav-brand">
+      <a href="/papers">📄 Daily Paper</a>
+    </div>
+    <div class="nav-links">
+      <a href="/papers" class="{% if request.url.path.startswith('/papers') %}active{% endif %}">论文</a>
+      <a href="/config" class="{% if request.url.path.startswith('/config') %}active{% endif %}">配置</a>
+      <span class="nav-user">{{ user.username }}</span>
+      <form action="/auth/logout" method="post" style="display:inline">
+        <button type="submit" class="btn-link">注销</button>
+      </form>
+    </div>
+  </nav>
+  {% endblock %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

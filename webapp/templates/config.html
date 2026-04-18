@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}配置 - Daily Paper{% endblock %}
+
+{% block content %}
+<div class="config-page">
+  <div class="config-header">
+    <h2>个人配置</h2>
+    <div class="config-actions">
+      <button class="btn btn-secondary" onclick="resetToDefaults()">重置为默认</button>
+      <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
+    </div>
+  </div>
+
+  <div id="saveMsg" class="alert" style="display:none"></div>
+
+  <div class="config-sections">
+
+    <!-- LLM 配置 -->
+    <section class="config-section">
+      <h3>LLM API 配置</h3>
+      <p class="section-desc">留空则使用系统默认配置（环境变量）。</p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="password" id="llm_api_key" value="{{ config.llm_api_key }}" placeholder="留空使用系统默认">
+        </div>
+        <div class="form-group">
+          <label>Endpoint</label>
+          <input type="text" id="llm_endpoint" value="{{ config.llm_endpoint }}" placeholder="如 https://aigc.sankuai.com/v1/openai/native">
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <input type="text" id="llm_model" value="{{ config.llm_model }}" placeholder="如 gpt-4.1-mini">
+        </div>
+      </div>
+    </section>
+
+    <!-- 抓取配置 -->
+    <section class="config-section">
+      <h3>arXiv 抓取配置</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>最大抓取数量</label>
+          <input type="number" id="max_results" value="{{ config.max_results }}" min="100" max="2000">
+        </div>
+        <div class="form-group">
+          <label>高优精选目标数</label>
+          <input type="number" id="high_priority_target" value="{{ config.high_priority_target }}" min="5" max="50">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>搜索关键词（每行一个）</label>
+        <textarea id="keywords" rows="6" placeholder="LLM&#10;Reinforcement Learning&#10;World Model">{{ config.keywords | join('\n') }}</textarea>
+      </div>
+      <div class="form-group">
+        <label>arXiv 分类（每行一个）</label>
+        <textarea id="categories" rows="4" placeholder="cs.AI&#10;cs.LG&#10;cs.CL">{{ config.categories | join('\n') }}</textarea>
+      </div>
+    </section>
+
+    <!-- 研究兴趣 -->
+    <section class="config-section">
+      <h3>研究兴趣描述</h3>
+      <p class="section-desc">用 Markdown 格式描述你的研究兴趣，会直接传给 LLM 作为评分参考。</p>
+      <div class="form-group">
+        <textarea id="interests_text" rows="12">{{ config.interests_text }}</textarea>
+      </div>
+    </section>
+
+    <!-- 研究兴趣分类表 -->
+    <section class="config-section">
+      <h3>研究兴趣分类表</h3>
+      <p class="section-desc">LLM 会将每篇论文归类到这里的 field/subfield 中，影响筛选和展示。</p>
+      <table class="interest-table" id="interestTable">
+        <thead>
+          <tr><th>Field</th><th>Subfield</th><th>Description</th><th></th></tr>
+        </thead>
+        <tbody id="interestTableBody">
+          {% for row in config.interest_table %}
+          <tr>
+            <td><input type="text" class="it-field" value="{{ row.field }}"></td>
+            <td><input type="text" class="it-subfield" value="{{ row.subfield }}"></td>
+            <td><input type="text" class="it-desc" value="{{ row.description }}"></td>
+            <td><button type="button" class="btn-icon btn-del" onclick="delRow(this)">✕</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="addRow()">+ 添加行</button>
+    </section>
+
+    <!-- 信号关键词 -->
+    <section class="config-section">
+      <h3>高信号关键词</h3>
+      <p class="section-desc">命中这些词的论文会被适当加分。每行一个（不区分大小写）。</p>
+      <textarea id="high_signal_keywords" rows="8">{{ config.high_signal_keywords | join('\n') }}</textarea>
+    </section>
+
+    <section class="config-section">
+      <h3>低信号关键词</h3>
+      <p class="section-desc">命中这些词的论文会被适当降权。每行一个。</p>
+      <textarea id="low_signal_keywords" rows="8">{{ config.low_signal_keywords | join('\n') }}</textarea>
+    </section>
+
+    <section class="config-section">
+      <h3>重点关注作者</h3>
+      <p class="section-desc">这些作者的论文会被加分。每行一个全名。</p>
+      <textarea id="notable_authors" rows="6">{{ config.notable_authors | join('\n') }}</textarea>
+    </section>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function getLines(id) {
+  return document.getElementById(id).value.split('\n').map(s => s.trim()).filter(Boolean);
+}
+
+function getInterestTable() {
+  const rows = document.querySelectorAll('#interestTableBody tr');
+  const result = [];
+  for (const row of rows) {
+    const field = row.querySelector('.it-field').value.trim();
+    const subfield = row.querySelector('.it-subfield').value.trim();
+    const desc = row.querySelector('.it-desc').value.trim();
+    if (field && subfield) result.push({field, subfield, description: desc});
+  }
+  return result;
+}
+
+function addRow() {
+  const tbody = document.getElementById('interestTableBody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" class="it-field" placeholder="RL"></td>
+    <td><input type="text" class="it-subfield" placeholder="RLHF"></td>
+    <td><input type="text" class="it-desc" placeholder="描述"></td>
+    <td><button type="button" class="btn-icon btn-del" onclick="delRow(this)">✕</button></td>`;
+  tbody.appendChild(tr);
+  tr.querySelector('.it-field').focus();
+}
+
+function delRow(btn) {
+  btn.closest('tr').remove();
+}
+
+async function saveConfig() {
+  const payload = {
+    keywords: getLines('keywords'),
+    categories: getLines('categories'),
+    interests_text: document.getElementById('interests_text').value,
+    interest_table: getInterestTable(),
+    high_signal_keywords: getLines('high_signal_keywords'),
+    low_signal_keywords: getLines('low_signal_keywords'),
+    notable_authors: getLines('notable_authors'),
+    llm_api_key: document.getElementById('llm_api_key').value.trim() || null,
+    llm_endpoint: document.getElementById('llm_endpoint').value.trim() || null,
+    llm_model: document.getElementById('llm_model').value.trim() || null,
+    max_results: parseInt(document.getElementById('max_results').value) || 800,
+    high_priority_target: parseInt(document.getElementById('high_priority_target').value) || 15,
+  };
+
+  try {
+    const res = await fetch('/config/api', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      showMsg('配置已保存！', 'success');
+    } else {
+      showMsg('保存失败：' + res.statusText, 'error');
+    }
+  } catch(e) {
+    showMsg('保存失败：' + e.message, 'error');
+  }
+}
+
+async function resetToDefaults() {
+  if (!confirm('确定重置为系统默认配置？当前配置将被覆盖。')) return;
+  try {
+    const res = await fetch('/config/defaults');
+    const defaults = await res.json();
+    document.getElementById('keywords').value = (defaults.keywords || []).join('\n');
+    document.getElementById('categories').value = (defaults.categories || []).join('\n');
+    document.getElementById('interests_text').value = defaults.interests_text || '';
+    document.getElementById('high_signal_keywords').value = (defaults.high_signal_keywords || []).join('\n');
+    document.getElementById('low_signal_keywords').value = (defaults.low_signal_keywords || []).join('\n');
+    document.getElementById('notable_authors').value = (defaults.notable_authors || []).join('\n');
+    document.getElementById('max_results').value = defaults.max_results || 800;
+    document.getElementById('high_priority_target').value = defaults.high_priority_target || 15;
+
+    // 重建 interest table
+    const tbody = document.getElementById('interestTableBody');
+    tbody.innerHTML = '';
+    for (const row of (defaults.interest_table || [])) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" class="it-field" value="${esc(row.field)}"></td>
+        <td><input type="text" class="it-subfield" value="${esc(row.subfield)}"></td>
+        <td><input type="text" class="it-desc" value="${esc(row.description)}"></td>
+        <td><button type="button" class="btn-icon btn-del" onclick="delRow(this)">✕</button></td>`;
+      tbody.appendChild(tr);
+    }
+    showMsg('已重置为默认配置，请点击保存。', 'info');
+  } catch(e) {
+    showMsg('重置失败：' + e.message, 'error');
+  }
+}
+
+function showMsg(msg, type) {
+  const el = document.getElementById('saveMsg');
+  el.textContent = msg;
+  el.className = 'alert alert-' + type;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+{% endblock %}

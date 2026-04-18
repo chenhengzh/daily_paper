@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+{% block title %}论文列表 - Daily Paper{% endblock %}
+
+{% block content %}
+<div class="page-layout">
+  <!-- 左侧筛选面板 -->
+  <aside class="filter-panel" id="filterPanel">
+    <div class="filter-section">
+      <h3>日期</h3>
+      <select id="dateSelect" onchange="changeDate(this.value)">
+        {% for d in dates %}
+        <option value="{{ d }}" {% if d == target_date %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+        {% if target_date not in dates %}
+        <option value="{{ target_date }}" selected>{{ target_date }}</option>
+        {% endif %}
+      </select>
+    </div>
+
+    <div class="filter-section">
+      <h3>Tier 筛选</h3>
+      <div class="tier-filters">
+        <label class="tier-label tier-s"><input type="checkbox" class="tier-cb" value="S" checked> S <span class="count" id="cnt-S">0</span></label>
+        <label class="tier-label tier-a"><input type="checkbox" class="tier-cb" value="A" checked> A <span class="count" id="cnt-A">0</span></label>
+        <label class="tier-label tier-b"><input type="checkbox" class="tier-cb" value="B" checked> B <span class="count" id="cnt-B">0</span></label>
+        <label class="tier-label tier-c"><input type="checkbox" class="tier-cb" value="C"> C <span class="count" id="cnt-C">0</span></label>
+      </div>
+      <label class="show-filtered-label">
+        <input type="checkbox" id="showFiltered"> 显示已过滤
+      </label>
+    </div>
+
+    <div class="filter-section">
+      <h3>研究方向</h3>
+      <div id="fieldFilters" class="field-filters"></div>
+    </div>
+
+    <div class="filter-section">
+      <h3>高优精选</h3>
+      <label class="show-filtered-label">
+        <input type="checkbox" id="onlyHP"> 只看高优精选
+      </label>
+    </div>
+
+    <div class="filter-section stats-section">
+      <div id="statsDisplay"></div>
+    </div>
+  </aside>
+
+  <!-- 中间内容区 -->
+  <div class="content-area">
+    <!-- 搜索栏 + 任务状态 -->
+    <div class="content-header">
+      <input type="text" id="searchInput" placeholder="搜索标题、摘要、TLDR..." oninput="applyFilters()">
+      <div id="jobStatus" class="job-status"></div>
+      <button class="btn btn-sm" onclick="triggerJob()">手动触发</button>
+    </div>
+
+    <!-- 论文列表 -->
+    <div id="paperList" class="paper-list"></div>
+    <div id="emptyState" class="empty-state" style="display:none">
+      <p>暂无数据。请手动触发任务或等待每日定时运行。</p>
+    </div>
+  </div>
+
+  <!-- 右侧总结面板 -->
+  <aside class="summary-panel">
+    <div class="summary-section">
+      <h3 class="collapsible-header" onclick="toggleSection('summaryBody')">
+        当日研究总结 <span class="toggle-icon">▼</span>
+      </h3>
+      <div id="summaryBody" class="collapsible-body">
+        <div id="dailySummary" class="summary-content">加载中...</div>
+      </div>
+    </div>
+    <div class="summary-section">
+      <h3 class="collapsible-header" onclick="toggleSection('ideasBody')">
+        Research Ideas <span class="toggle-icon">▼</span>
+      </h3>
+      <div id="ideasBody" class="collapsible-body collapsed">
+        <div id="dailyIdeas" class="summary-content"></div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- 论文详情模态框 -->
+<div id="paperModal" class="modal" onclick="closeModal(event)">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeModalBtn()">✕</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TARGET_DATE = "{{ target_date }}";
+let allPapers = [];
+let jobInfo = null;
+
+// ── 初始化 ──────────────────────────────────────────────────────────────────
+async function init() {
+  await loadPapers(TARGET_DATE);
+  await loadSummary(TARGET_DATE);
+}
+
+async function loadPapers(d) {
+  document.getElementById('paperList').innerHTML = '<div class="loading">加载中...</div>';
+  try {
+    const res = await fetch(`/papers/api?date=${d}`);
+    const data = await res.json();
+    allPapers = data.papers || [];
+    jobInfo = data.job;
+    renderJobStatus(jobInfo);
+    buildFieldFilters();
+    applyFilters();
+  } catch(e) {
+    document.getElementById('paperList').innerHTML = '<div class="error">加载失败: ' + e.message + '</div>';
+  }
+}
+
+async function loadSummary(d) {
+  try {
+    const res = await fetch(`/papers/summary?date=${d}`);
+    const data = await res.json();
+    document.getElementById('dailySummary').innerHTML = mdToHtml(data.daily_summary_zh || '（暂无总结）');
+    document.getElementById('dailyIdeas').innerHTML = mdToHtml(data.daily_ideas_zh || '（暂无内容）');
+  } catch(e) {}
+}
+
+// ── 筛选逻辑 ────────────────────────────────────────────────────────────────
+function applyFilters() {
+  const activeTiers = new Set(
+    [...document.querySelectorAll('.tier-cb:checked')].map(cb => cb.value)
+  );
+  const activeFields = new Set(
+    [...document.querySelectorAll('.field-cb:checked')].map(cb => cb.value)
+  );
+  const showFiltered = document.getElementById('showFiltered').checked;
+  const onlyHP = document.getElementById('onlyHP').checked;
+  const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+
+  let papers = allPapers;
+
+  if (!showFiltered) papers = papers.filter(p => p.keep);
+  if (activeTiers.size > 0) papers = papers.filter(p => activeTiers.has(p.tier));
+  if (activeFields.size > 0) papers = papers.filter(p => activeFields.has(p.interest_field));
+  if (onlyHP) papers = papers.filter(p => p.high_priority);
+  if (q) {
+    papers = papers.filter(p =>
+      (p.title || '').toLowerCase().includes(q) ||
+      (p.tldr_zh || '').toLowerCase().includes(q) ||
+      (p.tldr || '').toLowerCase().includes(q) ||
+      (p.summary || '').toLowerCase().includes(q)
+    );
+  }
+
+  renderPapers(papers);
+  updateCounts();
+}
+
+// ── 渲染论文列表 ────────────────────────────────────────────────────────────
+function renderPapers(papers) {
+  const list = document.getElementById('paperList');
+  const empty = document.getElementById('emptyState');
+
+  if (papers.length === 0) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  list.innerHTML = papers.map(p => paperCard(p)).join('');
+}
+
+function paperCard(p) {
+  const tier = p.tier || 'C';
+  const hp = p.high_priority ? `<span class="hp-badge">⭐ #${p.high_priority_rank}</span>` : '';
+  const score = p.overall_priority_score != null ? p.overall_priority_score.toFixed(1) : '-';
+  const rel = p.relevance_score != null ? p.relevance_score.toFixed(1) : '-';
+  const qual = p.quality_score != null ? p.quality_score.toFixed(1) : '-';
+  const tldr = p.tldr_zh || p.tldr || '';
+  const authors = (p.authors || []).slice(0, 3).join(', ') + ((p.authors || []).length > 3 ? ' 等' : '');
+  const field = p.interest_field ? `<span class="field-tag">${p.interest_field}</span>` : '';
+  const subfield = p.interest_subfield ? `<span class="subfield-tag">${p.interest_subfield}</span>` : '';
+  const tags = (p.tags || []).slice(0, 4).map(t => `<span class="tag">${t}</span>`).join('');
+  const notKept = !p.keep ? ' card-filtered' : '';
+
+  return `
+  <div class="paper-card${notKept}" onclick="showDetail('${p.arxiv_id}')">
+    <div class="card-header">
+      <span class="tier-badge tier-${tier.toLowerCase()}">${tier}</span>
+      ${hp}
+      <div class="card-scores">
+        <span title="综合">综 ${score}</span>
+        <span title="相关">关 ${rel}</span>
+        <span title="质量">质 ${qual}</span>
+      </div>
+    </div>
+    <h3 class="card-title">${escHtml(p.title || '')}</h3>
+    <div class="card-meta">
+      <span class="authors">${escHtml(authors)}</span>
+      ${field}${subfield}
+    </div>
+    ${tldr ? `<p class="card-tldr">${escHtml(tldr.slice(0, 200))}${tldr.length > 200 ? '...' : ''}</p>` : ''}
+    <div class="card-footer">
+      <div class="card-tags">${tags}</div>
+      <div class="card-links">
+        <a href="${p.url}" target="_blank" onclick="e=>e.stopPropagation()">arXiv</a>
+        ${p.pdf_url ? `<a href="${p.pdf_url}" target="_blank" onclick="e=>e.stopPropagation()">PDF</a>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── 论文详情模态框 ───────────────────────────────────────────────────────────
+async function showDetail(arxivId) {
+  const modal = document.getElementById('paperModal');
+  const body = document.getElementById('modalBody');
+  body.innerHTML = '<div class="loading">加载中...</div>';
+  modal.style.display = 'flex';
+
+  try {
+    const res = await fetch(`/papers/${arxivId}`);
+    const p = await res.json();
+    body.innerHTML = renderDetail(p);
+  } catch(e) {
+    body.innerHTML = '<div class="error">加载失败</div>';
+  }
+}
+
+function renderDetail(p) {
+  const scores = [
+    ['综合优先', p.overall_priority_score],
+    ['相关性', p.relevance_score],
+    ['质量', p.quality_score],
+    ['新颖性', p.novelty_claim_score],
+    ['清晰度', p.clarity_score],
+    ['潜在影响', p.potential_impact_score],
+  ];
+  const scoreBars = scores.map(([label, val]) => {
+    const v = val != null ? val : 0;
+    const pct = (v / 10 * 100).toFixed(0);
+    return `<div class="score-row">
+      <span class="score-label">${label}</span>
+      <div class="score-bar"><div class="score-fill" style="width:${pct}%"></div></div>
+      <span class="score-val">${v.toFixed(1)}</span>
+    </div>`;
+  }).join('');
+
+  const signals = (p.signal_high_keywords || []).map(k => `<span class="sig-tag sig-high">${k}</span>`).join('') +
+    (p.signal_notable_authors || []).map(a => `<span class="sig-tag sig-author">👤 ${a}</span>`).join('');
+
+  return `
+  <div class="detail-header">
+    <span class="tier-badge tier-${(p.tier||'c').toLowerCase()}">${p.tier || '?'}</span>
+    ${p.high_priority ? `<span class="hp-badge">⭐ 高优精选 #${p.high_priority_rank}</span>` : ''}
+  </div>
+  <h2 class="detail-title">${escHtml(p.title || '')}</h2>
+  <div class="detail-meta">
+    <span>${(p.authors || []).join(', ')}</span>
+    <span>${p.published_date ? p.published_date.slice(0,10) : ''}</span>
+    <a href="${p.url}" target="_blank">arXiv ↗</a>
+    ${p.pdf_url ? `<a href="${p.pdf_url}" target="_blank">PDF ↗</a>` : ''}
+  </div>
+
+  ${p.tldr_zh ? `<div class="detail-section"><h4>中文摘要</h4><p>${escHtml(p.tldr_zh)}</p></div>` : ''}
+  ${p.tldr ? `<div class="detail-section"><h4>TLDR</h4><p>${escHtml(p.tldr)}</p></div>` : ''}
+
+  <div class="detail-section">
+    <h4>评分详情</h4>
+    <div class="score-bars">${scoreBars}</div>
+  </div>
+
+  ${p.interest_field ? `<div class="detail-section"><h4>研究方向</h4>
+    <span class="field-tag">${p.interest_field}</span>
+    ${p.interest_subfield ? `<span class="subfield-tag">${p.interest_subfield}</span>` : ''}
+    ${p.interest_match_reason ? `<p class="match-reason">${escHtml(p.interest_match_reason)}</p>` : ''}
+  </div>` : ''}
+
+  ${signals ? `<div class="detail-section"><h4>信号关键词</h4><div>${signals}</div></div>` : ''}
+
+  <div class="detail-section">
+    <h4>原始摘要</h4>
+    <p class="abstract-text">${escHtml(p.summary || '')}</p>
+  </div>
+
+  ${!p.keep ? `<div class="detail-section"><h4>过滤原因</h4><p class="keep-reason">${escHtml(p.keep_reason || '')}</p></div>` : ''}
+  `;
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('paperModal')) closeModalBtn();
+}
+function closeModalBtn() {
+  document.getElementById('paperModal').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalBtn(); });
+
+// ── 构建 Field 筛选器 ───────────────────────────────────────────────────────
+function buildFieldFilters() {
+  const fields = {};
+  for (const p of allPapers) {
+    if (p.interest_field) fields[p.interest_field] = (fields[p.interest_field] || 0) + 1;
+  }
+  const container = document.getElementById('fieldFilters');
+  container.innerHTML = Object.entries(fields)
+    .sort((a,b) => b[1]-a[1])
+    .map(([f, cnt]) => `
+      <label class="field-filter-label">
+        <input type="checkbox" class="field-cb" value="${escHtml(f)}" checked onchange="applyFilters()">
+        ${escHtml(f)} <span class="count">${cnt}</span>
+      </label>`).join('');
+}
+
+function updateCounts() {
+  const counts = {S:0, A:0, B:0, C:0};
+  for (const p of allPapers) if (p.keep && p.tier) counts[p.tier] = (counts[p.tier]||0) + 1;
+  for (const t of ['S','A','B','C']) {
+    const el = document.getElementById('cnt-' + t);
+    if (el) el.textContent = counts[t] || 0;
+  }
+  const total = allPapers.length;
+  const kept = allPapers.filter(p => p.keep).length;
+  const hp = allPapers.filter(p => p.high_priority).length;
+  document.getElementById('statsDisplay').innerHTML =
+    `<div class="stat-item">总计 <b>${total}</b></div>
+     <div class="stat-item">保留 <b>${kept}</b></div>
+     <div class="stat-item">高优 <b>${hp}</b></div>`;
+}
+
+// ── 任务状态 ────────────────────────────────────────────────────────────────
+function renderJobStatus(job) {
+  const el = document.getElementById('jobStatus');
+  if (!job) { el.innerHTML = '<span class="status-none">无任务记录</span>'; return; }
+  const cls = {pending:'status-pending', scraping:'status-running', rating:'status-running', done:'status-done', failed:'status-failed'}[job.status] || '';
+  const label = {pending:'等待中', scraping:'抓取中', rating:'评分中', done:'已完成', failed:'失败'}[job.status] || job.status;
+  el.innerHTML = `<span class="status-badge ${cls}">${label}</span>
+    ${job.scrape_count != null ? `<span class="status-detail">抓取 ${job.scrape_count} 篇</span>` : ''}
+    ${job.kept_count != null ? `<span class="status-detail">保留 ${job.kept_count} 篇</span>` : ''}
+    ${job.error_msg ? `<span class="status-error" title="${escHtml(job.error_msg)}">⚠</span>` : ''}`;
+}
+
+async function triggerJob() {
+  const d = document.getElementById('dateSelect').value || TARGET_DATE;
+  if (!confirm(`触发 ${d} 的论文任务？`)) return;
+  try {
+    await fetch('/papers/trigger', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({date: d, force: false})
+    });
+    alert('任务已触发，请稍后刷新页面查看结果。');
+  } catch(e) {
+    alert('触发失败: ' + e.message);
+  }
+}
+
+// ── 日期切换 ────────────────────────────────────────────────────────────────
+function changeDate(d) {
+  window.location.href = `/papers?date=${d}`;
+}
+
+// ── 折叠面板 ────────────────────────────────────────────────────────────────
+function toggleSection(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('collapsed');
+}
+
+// ── 工具函数 ────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function mdToHtml(md) {
+  if (!md) return '';
+  return md
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/^(?!<[hul])(.+)$/gm, '<p>$1</p>');
+}
+
+// 绑定筛选事件
+document.querySelectorAll('.tier-cb').forEach(cb => cb.addEventListener('change', applyFilters));
+document.getElementById('showFiltered').addEventListener('change', applyFilters);
+document.getElementById('onlyHP').addEventListener('change', applyFilters);
+
+init();
+</script>
+{% endblock %}

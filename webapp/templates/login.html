@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if mode == 'register' %}注册{% else %}登录{% endif %} - Daily Paper</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="auth-page">
+  <div class="auth-container">
+    <div class="auth-card">
+      <h1>📄 Daily Paper</h1>
+      <p class="auth-subtitle">每日 arXiv 论文智能筛选</p>
+
+      <div class="auth-tabs">
+        <a href="/auth/login" class="tab {% if mode != 'register' %}active{% endif %}">登录</a>
+        <a href="/auth/register" class="tab {% if mode == 'register' %}active{% endif %}">注册</a>
+      </div>
+
+      {% if error %}
+      <div class="alert alert-error">{{ error }}</div>
+      {% endif %}
+
+      {% if mode == 'register' %}
+      <form action="/auth/register" method="post" class="auth-form">
+        <div class="form-group">
+          <label>用户名</label>
+          <input type="text" name="username" required minlength="2" maxlength="32" placeholder="2-32 个字符" autofocus>
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" name="password" required minlength="6" placeholder="至少 6 位">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">注册</button>
+      </form>
+      {% else %}
+      <form action="/auth/login" method="post" class="auth-form">
+        <div class="form-group">
+          <label>用户名</label>
+          <input type="text" name="username" required autofocus>
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" name="password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">登录</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>
