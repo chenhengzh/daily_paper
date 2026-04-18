@@ -469,28 +469,23 @@ function renderJobStatus(job) {
     ${job.error_msg ? `<span class="status-error" title="${escHtml(job.error_msg)}">⚠</span>` : ''}`;
 }
 
-async function triggerJob() {
-  if (!confirm('触发论文抓取与评分（将处理最近 10 天数据）？')) return;
+function _setTriggerRunning(running) {
   const btn = document.getElementById('triggerBtn');
+  const sel = document.getElementById('dateSelect');
+  btn.disabled = running;
+  btn.textContent = running ? '运行中...' : '触发';
+  if (sel) sel.disabled = running;
+}
+
+async function _readTriggerProgress() {
   const prog = document.getElementById('triggerProgress');
-  btn.disabled = true;
-  btn.textContent = '运行中...';
   prog.style.display = 'block';
-  prog.textContent = '正在启动...';
-
+  let datesProcessed = 0;
   try {
-    await fetch('/papers/trigger', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({force: false})
-    });
-
-    // Stream progress via SSE
     const res = await fetch('/papers/trigger/progress');
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = '';
-    let datesProcessed = 0;
     while (true) {
       const {done, value} = await reader.read();
       if (done) break;
@@ -512,10 +507,8 @@ async function triggerJob() {
             prog.innerHTML = `<span class="pulse-dot"></span> 跳过 ${evt.date}（无数据）`;
           } else if (evt.type === 'all_done') {
             prog.innerHTML = `✓ 全部完成，共处理 ${evt.processed} 天`;
-            setTimeout(() => {
-              prog.style.display = 'none';
-              window.location.reload();
-            }, 1500);
+            _setTriggerRunning(false);
+            setTimeout(() => { prog.style.display = 'none'; window.location.reload(); }, 1500);
             return;
           } else if (evt.type === 'error') {
             prog.innerHTML = `<span style="color:var(--red)">错误: ${escHtml(evt.message)}</span>`;
@@ -524,10 +517,27 @@ async function triggerJob() {
       }
     }
   } catch(e) {
-    prog.innerHTML = `<span style="color:var(--red)">触发失败: ${escHtml(e.message)}</span>`;
+    prog.innerHTML = `<span style="color:var(--red)">进度读取失败: ${escHtml(e.message)}</span>`;
   } finally {
-    btn.disabled = false;
-    btn.textContent = '触发';
+    _setTriggerRunning(false);
+  }
+}
+
+async function triggerJob() {
+  if (!confirm('触发论文抓取与评分（将处理最近 10 天数据）？')) return;
+  _setTriggerRunning(true);
+  document.getElementById('triggerProgress').textContent = '正在启动...';
+  try {
+    await fetch('/papers/trigger', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({force: false})
+    });
+    await _readTriggerProgress();
+  } catch(e) {
+    document.getElementById('triggerProgress').innerHTML =
+      `<span style="color:var(--red)">触发失败: ${escHtml(e.message)}</span>`;
+    _setTriggerRunning(false);
   }
 }
 
