@@ -38,12 +38,6 @@
         <div id="fieldFilters" class="field-filters"></div>
       </div>
 
-      <div class="filter-section">
-        <label class="show-filtered-label">
-          <input type="checkbox" id="onlyHP"> 只看高优精选
-        </label>
-      </div>
-
       <div class="filter-section stats-section">
         <div id="statsDisplay"></div>
       </div>
@@ -106,6 +100,12 @@
 </div>
 {% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/marked@13/marked.min.js"></script>
+{% endblock %}
+
 {% block scripts %}
 <script>
 const TARGET_DATE = "{{ target_date }}";
@@ -160,14 +160,12 @@ function applyFilters() {
   const activeFields = new Set(
     [...document.querySelectorAll('.field-cb:checked')].map(cb => cb.value)
   );
-  const onlyHP = document.getElementById('onlyHP').checked;
   const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
 
   let papers = allPapers;
 
   if (currentView === 'selected') papers = papers.filter(p => p.keep);
   if (activeFields.size > 0) papers = papers.filter(p => !p.interest_field || activeFields.has(p.interest_field));
-  if (onlyHP) papers = papers.filter(p => p.high_priority);
   if (q) {
     papers = papers.filter(p =>
       (p.title || '').toLowerCase().includes(q) ||
@@ -323,7 +321,7 @@ async function sendChat() {
     const reply = data.reply || '（无回复）';
     chatHistory.push({ role: 'assistant', content: reply });
     const el = document.getElementById(loadingId);
-    if (el) { el.textContent = reply; el.classList.remove('loading'); }
+    if (el) { el.innerHTML = renderMarkdown(reply); el.classList.remove('loading'); }
   } catch(e) {
     const el = document.getElementById(loadingId);
     if (el) { el.textContent = '请求失败: ' + e.message; el.classList.remove('loading'); }
@@ -338,9 +336,28 @@ function appendBubble(role, text, id, isLoading) {
   const div = document.createElement('div');
   div.className = 'chat-bubble ' + role + (isLoading ? ' loading' : '');
   if (id) div.id = id;
-  div.textContent = text;
+  if (isLoading || role === 'user') {
+    div.textContent = text;
+  } else {
+    div.innerHTML = renderMarkdown(text);
+  }
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
+}
+
+function renderMarkdown(text) {
+  // 先用 marked 解析 Markdown
+  let html = marked.parse(text, { breaks: true, gfm: true });
+  // 再用 KaTeX 渲染 LaTeX（$...$ 和 $$...$$）
+  html = html.replace(/\$\$([^$]+?)\$\$/gs, (_, tex) => {
+    try { return katex.renderToString(tex.trim(), { displayMode: true, throwOnError: false }); }
+    catch(e) { return `<code>$$${tex}$$</code>`; }
+  });
+  html = html.replace(/\$([^$\n]+?)\$/g, (_, tex) => {
+    try { return katex.renderToString(tex.trim(), { displayMode: false, throwOnError: false }); }
+    catch(e) { return `<code>$${tex}$</code>`; }
+  });
+  return html;
 }
 
 function clearChat() {
@@ -491,8 +508,6 @@ function mdToHtml(md) {
     .replace(/\n\n/g, '</p><p>')
     .replace(/^(?!<[hul])(.+)$/gm, '<p>$1</p>');
 }
-
-document.getElementById('onlyHP').addEventListener('change', applyFilters);
 
 init();
 </script>

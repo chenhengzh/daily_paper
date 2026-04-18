@@ -17,7 +17,7 @@
   --radius: 8px;
   --shadow: 0 2px 8px rgba(0,0,0,0.4);
   --lw: 220px;
-  --rw: 360px;
+  --rw: 500px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -279,7 +279,7 @@ select { cursor: pointer; }
 /* 当日总结 */
 .summary-body {
   flex: 1; overflow-y: auto; padding: 14px;
-  font-size: 13px; color: var(--text2); line-height: 1.7;
+  font-size: 13px; color: var(--text2); line-height: 1.7; min-height: 0;
 }
 .summary-body h2, .summary-body h3, .summary-body h4 { color: var(--text); margin: 10px 0 4px; font-size: 13px; }
 .summary-body ul { padding-left: 18px; }
@@ -289,8 +289,10 @@ select { cursor: pointer; }
 
 /* 论文详情 */
 .detail-body {
-  flex: 1; overflow-y: auto; padding: 14px;
+  overflow-y: auto; padding: 14px;
   display: flex; flex-direction: column; gap: 10px;
+  max-height: 240px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
 }
 .detail-title { font-size: 15px; font-weight: 700; line-height: 1.4; color: var(--text); }
 .detail-meta { display: flex; gap: 8px; font-size: 11px; color: var(--text3); flex-wrap: wrap; align-items: center; }
@@ -310,9 +312,8 @@ details summary:hover { color: var(--text2); }
 
 /* 聊天区 */
 .chat-wrap {
-  border-top: 1px solid var(--border);
   display: flex; flex-direction: column;
-  height: 280px; flex-shrink: 0;
+  flex: 1; min-height: 0;
 }
 .chat-header {
   padding: 8px 12px; font-size: 11px; font-weight: 600;
@@ -342,6 +343,22 @@ details summary:hover { color: var(--text2); }
   border-bottom-left-radius: 3px;
 }
 .chat-bubble.ai.loading { color: var(--text3); font-style: italic; }
+/* Markdown 渲染样式（AI 气泡内） */
+.chat-bubble.ai p { margin: 0 0 6px; }
+.chat-bubble.ai p:last-child { margin-bottom: 0; }
+.chat-bubble.ai ul, .chat-bubble.ai ol { padding-left: 18px; margin: 4px 0; }
+.chat-bubble.ai li { margin-bottom: 2px; }
+.chat-bubble.ai h1,.chat-bubble.ai h2,.chat-bubble.ai h3,.chat-bubble.ai h4 { margin: 8px 0 4px; color: var(--text); font-size: 13px; }
+.chat-bubble.ai code { background: rgba(0,0,0,0.3); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: monospace; }
+.chat-bubble.ai pre { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; overflow-x: auto; margin: 6px 0; }
+.chat-bubble.ai pre code { background: none; padding: 0; font-size: 12px; }
+.chat-bubble.ai blockquote { border-left: 3px solid var(--accent); padding-left: 10px; color: var(--text3); margin: 6px 0; }
+.chat-bubble.ai strong { color: var(--text); }
+.chat-bubble.ai table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 12px; }
+.chat-bubble.ai th,.chat-bubble.ai td { border: 1px solid var(--border); padding: 4px 8px; }
+.chat-bubble.ai th { background: var(--bg); }
+/* KaTeX display mode */
+.chat-bubble.ai .katex-display { overflow-x: auto; margin: 8px 0; }
 .chat-input-row {
   display: flex; gap: 6px; padding: 8px 10px;
   border-top: 1px solid var(--border); flex-shrink: 0;
