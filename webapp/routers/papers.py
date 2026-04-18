@@ -258,6 +258,15 @@ async def trigger_job(
             llm_mod._DEFAULT_CLIENT = None
 
             from datetime import date as _date
+            from webapp.models import UserConfig as _UserConfig
+            _db2 = __import__('webapp.database', fromlist=['SessionLocal']).SessionLocal()
+            try:
+                _cfg = _db2.query(_UserConfig).filter(_UserConfig.user_id == user_id).first()
+                _keywords = json.loads(_cfg.keywords_json or "[]") if _cfg else None
+                _categories = json.loads(_cfg.categories_json or "[]") if _cfg else None
+                _max_results = _cfg.max_results if _cfg else 800
+            finally:
+                _db2.close()
             today = _date.today()
 
             async def _run_all():
@@ -266,7 +275,7 @@ async def trigger_job(
                     d = today - timedelta(days=i)
                     _push({"type": "scraping", "date": d.isoformat(), "step": i + 1})
                     logger.info(f"[trigger] 抓取 {d}")
-                    raw = scrape_and_store(d)
+                    raw = scrape_and_store(d, max_results=_max_results, keywords=_keywords, categories=_categories)
                     from webapp.database import SessionLocal as _SL
                     from webapp.models import Paper as _Paper
                     _db = _SL()

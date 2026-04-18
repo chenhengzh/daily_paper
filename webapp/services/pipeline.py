@@ -25,13 +25,23 @@ def _load_src():
         sys.path.insert(0, src_dir)
 
 
-def scrape_and_store(target_date: date, max_results: int = 800) -> list[dict]:
+def scrape_and_store(
+    target_date: date,
+    max_results: int = 800,
+    keywords: list[str] | None = None,
+    categories: list[str] | None = None,
+) -> list[dict]:
     """全局抓取：从 arXiv 抓取指定日期的论文并存入 papers 表。幂等（upsert）。"""
     _load_src()
     from scraper import fetch_daily_papers
 
     logger.info(f"[pipeline] 开始抓取 {target_date.isoformat()}")
-    raw_papers = fetch_daily_papers(specified_date=target_date, max_results=max_results)
+    raw_papers = fetch_daily_papers(
+        specified_date=target_date,
+        max_results=max_results,
+        keywords=keywords,
+        categories=categories,
+    )
     logger.info(f"[pipeline] 抓取到 {len(raw_papers)} 篇")
 
     if not raw_papers:
@@ -299,15 +309,17 @@ async def run_daily_pipeline(target_date: date, force: bool = False) -> None:
         logger.info("[pipeline] 没有活跃用户，跳过")
         return
 
-    # 阶段1：全局抓取（取第一个用户的 max_results 配置）
+    # 阶段1：全局抓取（取第一个用户的配置）
     db = SessionLocal()
     try:
         cfg = db.query(UserConfig).filter(UserConfig.user_id == user_ids[0]).first()
         max_results = cfg.max_results if cfg else 800
+        keywords = json.loads(cfg.keywords_json or "[]") if cfg else None
+        categories = json.loads(cfg.categories_json or "[]") if cfg else None
     finally:
         db.close()
 
-    scrape_and_store(target_date, max_results=max_results)
+    scrape_and_store(target_date, max_results=max_results, keywords=keywords, categories=categories)
 
     # 阶段2：并发为每个用户评分
     tasks = [rate_papers_for_user(uid, target_date, force=force) for uid in user_ids]
