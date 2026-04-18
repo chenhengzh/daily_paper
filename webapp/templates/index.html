@@ -523,7 +523,12 @@ async function _readTriggerProgress() {
           } else if (evt.type === 'all_done') {
             prog.innerHTML = `✓ 全部完成，共处理 ${evt.processed} 天`;
             _setTriggerRunning(false);
-            setTimeout(() => { prog.style.display = 'none'; window.location.reload(); }, 1500);
+            setTimeout(async () => {
+              prog.style.display = 'none';
+              await _refreshDateSelect();
+              await loadPapers(TARGET_DATE);
+              await loadSummary(TARGET_DATE);
+            }, 1500);
             return;
           } else if (evt.type === 'error') {
             prog.innerHTML = `<span style="color:var(--red)">错误: ${escHtml(evt.message)}</span>`;
@@ -536,6 +541,17 @@ async function _readTriggerProgress() {
   } finally {
     _setTriggerRunning(false);
   }
+}
+
+async function _refreshDateSelect() {
+  try {
+    const dates = await (await fetch('/papers/dates')).json();
+    const sel = document.getElementById('dateSelect');
+    if (!sel) return;
+    sel.innerHTML = dates.map(d =>
+      `<option value="${d}"${d === TARGET_DATE ? ' selected' : ''}>${d}</option>`
+    ).join('');
+  } catch(e) {}
 }
 
 async function triggerJob() {
@@ -557,8 +573,11 @@ async function triggerJob() {
 }
 
 // ── 日期切换 ─────────────────────────────────────────────────────────────────
-function changeDate(d) {
-  window.location.href = `/papers?date=${d}`;
+async function changeDate(d) {
+  TARGET_DATE = d;
+  history.pushState({date: d}, '', `/papers?date=${d}`);
+  await loadPapers(d);
+  await loadSummary(d);
 }
 
 // ── 三栏拖动 resize ──────────────────────────────────────────────────────────
