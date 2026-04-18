@@ -270,6 +270,57 @@ async def trigger_job(
     return {"status": "triggered", "date": target_date.isoformat(), "user": user.username}
 
 
+@router.post("/{arxiv_id}/chat", response_class=JSONResponse)
+async def paper_chat(arxiv_id: str, request: Request, db: Session = Depends(get_db)):
+    """与 LLM 讨论指定论文。Body: { messages: [{role, content}, ...] }"""
+    import sys, os
+    src_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "src")
+    if src_dir not in sys.path:
+        sys.path.insert(0, src_dir)
+    from remote_llm_api import default_chat_completion_text
+
+    user = _current_user_dep(request, db)
+    body = await request.json()
+    user_messages = body.get("messages", [])
+
+    paper = db.query(Paper).filter(Paper.arxiv_id == arxiv_id).first()
+    if not paper:
+        raise HTTPException(status_code=404, detail="论文不存在")
+
+    result = (
+        db.query(UserPaperResult)
+        .filter(UserPaperResult.user_id == user.id, UserPaperResult.paper_id == paper.id)
+        .first()
+    )
+
+    authors = ", ".join(json.loads(paper.authors_json or "[]")[:5])
+    tldr_zh = (result.tldr_zh or "") if result else ""
+    score = f"{result.overall_priority_score:.1f}" if result and result.overall_priority_score else "N/A"
+
+    system_prompt = f"""你是一个论文阅读助手。以下是读者正在阅读的论文：
+
+标题：{paper.title}
+作者：{authors}
+摘要：{paper.summary}
+中文摘要：{tldr_zh}
+综合评分：{score}
+
+请根据以上信息回答读者的问题。可以用中文回复。"""
+
+    messages = [{"role": "system", "content": system_prompt}] + user_messages
+
+    try:
+        reply = await default_chat_completion_text(
+            namespace="paper_chat",
+            messages=messages,
+            max_tokens=1024,
+            temperature=0.7,
+        )
+        return {"reply": reply}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ── 工具函数 ────────────────────────────────────────────────────────────────
 
 def _parse_date(date_str: Optional[str]) -> date:

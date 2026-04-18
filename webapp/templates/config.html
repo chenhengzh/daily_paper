@@ -6,8 +6,8 @@
   <div class="config-header">
     <h2>个人配置</h2>
     <div class="config-actions">
-      <button class="btn btn-secondary" onclick="resetToDefaults()">重置为默认</button>
-      <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
+      <button class="btn btn-secondary" onclick="resetToDefaults()">重置默认</button>
+      <button class="btn btn-primary" onclick="saveConfig()">保存</button>
     </div>
   </div>
 
@@ -15,98 +15,98 @@
 
   <div class="config-sections">
 
-    <!-- LLM 配置 -->
+    <!-- 研究兴趣（最重要） -->
     <section class="config-section">
-      <h3>LLM API 配置</h3>
-      <p class="section-desc">留空则使用系统默认配置（环境变量）。</p>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>API Key</label>
-          <input type="password" id="llm_api_key" value="{{ config.llm_api_key }}" placeholder="留空使用系统默认">
-        </div>
-        <div class="form-group">
-          <label>Endpoint</label>
-          <input type="text" id="llm_endpoint" value="{{ config.llm_endpoint }}" placeholder="如 https://aigc.sankuai.com/v1/openai/native">
-        </div>
-        <div class="form-group">
-          <label>Model</label>
-          <input type="text" id="llm_model" value="{{ config.llm_model }}" placeholder="如 gpt-4.1-mini">
-        </div>
-      </div>
+      <h3>研究兴趣描述</h3>
+      <p class="section-desc">用自然语言描述你的研究方向，LLM 会据此对论文打分和筛选。</p>
+      <textarea id="interests_text" rows="10">{{ config.interests_text }}</textarea>
     </section>
 
-    <!-- 抓取配置 -->
+    <!-- arXiv 搜索 -->
     <section class="config-section">
-      <h3>arXiv 抓取配置</h3>
-      <div class="form-grid">
+      <h3>arXiv 搜索配置</h3>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr auto auto">
         <div class="form-group">
-          <label>最大抓取数量</label>
-          <input type="number" id="max_results" value="{{ config.max_results }}" min="100" max="2000">
+          <label>搜索关键词（每行一个）</label>
+          <textarea id="keywords" rows="5">{{ config.keywords | join('\n') }}</textarea>
+        </div>
+        <div class="form-group">
+          <label>arXiv 分类（每行一个）</label>
+          <textarea id="categories" rows="5">{{ config.categories | join('\n') }}</textarea>
         </div>
         <div class="form-group">
           <label>高优精选目标数</label>
-          <input type="number" id="high_priority_target" value="{{ config.high_priority_target }}" min="5" max="50">
+          <input type="number" id="high_priority_target" value="{{ config.high_priority_target }}" min="5" max="50" style="width:80px">
         </div>
       </div>
-      <div class="form-group">
-        <label>搜索关键词（每行一个）</label>
-        <textarea id="keywords" rows="6" placeholder="LLM&#10;Reinforcement Learning&#10;World Model">{{ config.keywords | join('\n') }}</textarea>
+    </section>
+
+    <!-- 高级设置（折叠） -->
+    <details class="advanced-section">
+      <summary>高级设置</summary>
+      <div class="advanced-inner">
+
+        <section style="margin-bottom:20px">
+          <h3 style="font-size:13px;margin-bottom:10px">信号关键词</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>高信号关键词（每行一个，命中加分）</label>
+              <textarea id="high_signal_keywords" rows="8">{{ config.high_signal_keywords | join('\n') }}</textarea>
+            </div>
+            <div class="form-group">
+              <label>低信号关键词（每行一个，命中降权）</label>
+              <textarea id="low_signal_keywords" rows="8">{{ config.low_signal_keywords | join('\n') }}</textarea>
+            </div>
+            <div class="form-group">
+              <label>重点关注作者（每行一个全名）</label>
+              <textarea id="notable_authors" rows="8">{{ config.notable_authors | join('\n') }}</textarea>
+            </div>
+          </div>
+        </section>
+
+        <section style="margin-bottom:20px">
+          <h3 style="font-size:13px;margin-bottom:10px">研究兴趣分类表</h3>
+          <p class="section-desc">LLM 会将论文归类到这里的 field/subfield，用于左侧筛选。</p>
+          <table class="interest-table" id="interestTable">
+            <thead><tr><th>Field</th><th>Subfield</th><th>Description</th><th></th></tr></thead>
+            <tbody id="interestTableBody">
+              {% for row in config.interest_table %}
+              <tr>
+                <td><input type="text" class="it-field" value="{{ row.field }}"></td>
+                <td><input type="text" class="it-subfield" value="{{ row.subfield }}"></td>
+                <td><input type="text" class="it-desc" value="{{ row.description }}"></td>
+                <td><button type="button" class="btn-icon btn-del" onclick="delRow(this)">✕</button></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="addRow()">+ 添加行</button>
+        </section>
+
+        <section>
+          <h3 style="font-size:13px;margin-bottom:10px">LLM API 覆盖（留空使用系统默认）</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>API Key</label>
+              <input type="password" id="llm_api_key" value="{{ config.llm_api_key }}" placeholder="留空使用系统默认">
+            </div>
+            <div class="form-group">
+              <label>Endpoint</label>
+              <input type="text" id="llm_endpoint" value="{{ config.llm_endpoint }}" placeholder="https://...">
+            </div>
+            <div class="form-group">
+              <label>Model</label>
+              <input type="text" id="llm_model" value="{{ config.llm_model }}" placeholder="deepseek-v3.2-huawei">
+            </div>
+          </div>
+          <div class="form-group" style="max-width:200px">
+            <label>最大抓取数量</label>
+            <input type="number" id="max_results" value="{{ config.max_results }}" min="100" max="2000">
+          </div>
+        </section>
+
       </div>
-      <div class="form-group">
-        <label>arXiv 分类（每行一个）</label>
-        <textarea id="categories" rows="4" placeholder="cs.AI&#10;cs.LG&#10;cs.CL">{{ config.categories | join('\n') }}</textarea>
-      </div>
-    </section>
-
-    <!-- 研究兴趣 -->
-    <section class="config-section">
-      <h3>研究兴趣描述</h3>
-      <p class="section-desc">用 Markdown 格式描述你的研究兴趣，会直接传给 LLM 作为评分参考。</p>
-      <div class="form-group">
-        <textarea id="interests_text" rows="12">{{ config.interests_text }}</textarea>
-      </div>
-    </section>
-
-    <!-- 研究兴趣分类表 -->
-    <section class="config-section">
-      <h3>研究兴趣分类表</h3>
-      <p class="section-desc">LLM 会将每篇论文归类到这里的 field/subfield 中，影响筛选和展示。</p>
-      <table class="interest-table" id="interestTable">
-        <thead>
-          <tr><th>Field</th><th>Subfield</th><th>Description</th><th></th></tr>
-        </thead>
-        <tbody id="interestTableBody">
-          {% for row in config.interest_table %}
-          <tr>
-            <td><input type="text" class="it-field" value="{{ row.field }}"></td>
-            <td><input type="text" class="it-subfield" value="{{ row.subfield }}"></td>
-            <td><input type="text" class="it-desc" value="{{ row.description }}"></td>
-            <td><button type="button" class="btn-icon btn-del" onclick="delRow(this)">✕</button></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      <button type="button" class="btn btn-secondary btn-sm" onclick="addRow()">+ 添加行</button>
-    </section>
-
-    <!-- 信号关键词 -->
-    <section class="config-section">
-      <h3>高信号关键词</h3>
-      <p class="section-desc">命中这些词的论文会被适当加分。每行一个（不区分大小写）。</p>
-      <textarea id="high_signal_keywords" rows="8">{{ config.high_signal_keywords | join('\n') }}</textarea>
-    </section>
-
-    <section class="config-section">
-      <h3>低信号关键词</h3>
-      <p class="section-desc">命中这些词的论文会被适当降权。每行一个。</p>
-      <textarea id="low_signal_keywords" rows="8">{{ config.low_signal_keywords | join('\n') }}</textarea>
-    </section>
-
-    <section class="config-section">
-      <h3>重点关注作者</h3>
-      <p class="section-desc">这些作者的论文会被加分。每行一个全名。</p>
-      <textarea id="notable_authors" rows="6">{{ config.notable_authors | join('\n') }}</textarea>
-    </section>
+    </details>
 
   </div>
 </div>
@@ -142,9 +142,7 @@ function addRow() {
   tr.querySelector('.it-field').focus();
 }
 
-function delRow(btn) {
-  btn.closest('tr').remove();
-}
+function delRow(btn) { btn.closest('tr').remove(); }
 
 async function saveConfig() {
   const payload = {
@@ -161,60 +159,45 @@ async function saveConfig() {
     max_results: parseInt(document.getElementById('max_results').value) || 800,
     high_priority_target: parseInt(document.getElementById('high_priority_target').value) || 15,
   };
-
   try {
     const res = await fetch('/config/api', {
-      method: 'PUT',
-      headers: {'Content-Type': 'application/json'},
+      method: 'PUT', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(payload)
     });
-    if (res.ok) {
-      showMsg('配置已保存！', 'success');
-    } else {
-      showMsg('保存失败：' + res.statusText, 'error');
-    }
-  } catch(e) {
-    showMsg('保存失败：' + e.message, 'error');
-  }
+    showMsg(res.ok ? '配置已保存！' : '保存失败：' + res.statusText, res.ok ? 'success' : 'error');
+  } catch(e) { showMsg('保存失败：' + e.message, 'error'); }
 }
 
 async function resetToDefaults() {
-  if (!confirm('确定重置为系统默认配置？当前配置将被覆盖。')) return;
+  if (!confirm('确定重置为系统默认配置？')) return;
   try {
     const res = await fetch('/config/defaults');
-    const defaults = await res.json();
-    document.getElementById('keywords').value = (defaults.keywords || []).join('\n');
-    document.getElementById('categories').value = (defaults.categories || []).join('\n');
-    document.getElementById('interests_text').value = defaults.interests_text || '';
-    document.getElementById('high_signal_keywords').value = (defaults.high_signal_keywords || []).join('\n');
-    document.getElementById('low_signal_keywords').value = (defaults.low_signal_keywords || []).join('\n');
-    document.getElementById('notable_authors').value = (defaults.notable_authors || []).join('\n');
-    document.getElementById('max_results').value = defaults.max_results || 800;
-    document.getElementById('high_priority_target').value = defaults.high_priority_target || 15;
-
-    // 重建 interest table
+    const d = await res.json();
+    document.getElementById('keywords').value = (d.keywords || []).join('\n');
+    document.getElementById('categories').value = (d.categories || []).join('\n');
+    document.getElementById('interests_text').value = d.interests_text || '';
+    document.getElementById('high_signal_keywords').value = (d.high_signal_keywords || []).join('\n');
+    document.getElementById('low_signal_keywords').value = (d.low_signal_keywords || []).join('\n');
+    document.getElementById('notable_authors').value = (d.notable_authors || []).join('\n');
+    document.getElementById('max_results').value = d.max_results || 800;
+    document.getElementById('high_priority_target').value = d.high_priority_target || 15;
     const tbody = document.getElementById('interestTableBody');
     tbody.innerHTML = '';
-    for (const row of (defaults.interest_table || [])) {
+    for (const row of (d.interest_table || [])) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><input type="text" class="it-field" value="${esc(row.field)}"></td>
+      tr.innerHTML = `<td><input type="text" class="it-field" value="${esc(row.field)}"></td>
         <td><input type="text" class="it-subfield" value="${esc(row.subfield)}"></td>
         <td><input type="text" class="it-desc" value="${esc(row.description)}"></td>
         <td><button type="button" class="btn-icon btn-del" onclick="delRow(this)">✕</button></td>`;
       tbody.appendChild(tr);
     }
-    showMsg('已重置为默认配置，请点击保存。', 'info');
-  } catch(e) {
-    showMsg('重置失败：' + e.message, 'error');
-  }
+    showMsg('已重置，请点击保存。', 'info');
+  } catch(e) { showMsg('重置失败：' + e.message, 'error'); }
 }
 
 function showMsg(msg, type) {
   const el = document.getElementById('saveMsg');
-  el.textContent = msg;
-  el.className = 'alert alert-' + type;
-  el.style.display = 'block';
+  el.textContent = msg; el.className = 'alert alert-' + type; el.style.display = 'block';
   setTimeout(() => { el.style.display = 'none'; }, 4000);
 }
 
