@@ -235,7 +235,6 @@ async function showDetail(arxivId) {
   if (isNew) {
     currentArxivId = arxivId;
     chatHistory = [];
-    document.getElementById('chatMessages').innerHTML = '';
   }
   // 高亮卡片
   document.querySelectorAll('.paper-card').forEach(el => el.classList.remove('active'));
@@ -253,7 +252,6 @@ async function showDetail(arxivId) {
   } catch(e) {
     body.innerHTML = '<div class="error">加载失败</div>';
   }
-  if (isNew) await loadChatHistory(arxivId);
 }
 
 function scoreBar(label, val) {
