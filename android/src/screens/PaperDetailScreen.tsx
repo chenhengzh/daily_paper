@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, Pressable,
   LayoutAnimation, UIManager, Platform,
@@ -10,6 +10,7 @@ import { RootStackParamList } from '../navigation/RootNavigator';
 import { TagChip } from '../components/TagChip';
 import { ScoreBar } from '../components/ScoreBar';
 import { useTheme } from '../hooks/useTheme';
+import { isBookmarked, toggleBookmark } from '../storage/bookmarks';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -39,6 +40,16 @@ export function PaperDetailScreen({ route, navigation }: Props) {
   const { colors } = useTheme();
   const { paper } = route.params;
   const [abstractExpanded, setAbstractExpanded] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
+
+  useEffect(() => {
+    isBookmarked(paper.arxiv_id).then(setBookmarked);
+  }, [paper.arxiv_id]);
+
+  const handleBookmark = async () => {
+    const newVal = await toggleBookmark(paper.arxiv_id);
+    setBookmarked(newVal);
+  };
 
   const toggleAbstract = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -114,6 +125,16 @@ export function PaperDetailScreen({ route, navigation }: Props) {
               <Text style={[styles.btnText, { color: colors.text }]}>PDF ↗</Text>
             </Pressable>
           )}
+          <Pressable
+            onPress={handleBookmark}
+            style={({ pressed }) => [
+              styles.btn,
+              styles.btnSquare,
+              { backgroundColor: bookmarked ? colors.accentLight : colors.bg3, borderWidth: 1, borderColor: bookmarked ? colors.accent : colors.border, opacity: pressed ? 0.8 : 1 },
+            ]}
+          >
+            <Text style={{ fontSize: 20 }}>{bookmarked ? '🔖' : '📑'}</Text>
+          </Pressable>
         </View>
 
         {/* TLDR */}
@@ -194,6 +215,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  btnSquare: {
+    flex: 0,
+    width: 48,
   },
   btnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   tldr: { fontSize: 15, lineHeight: 23 },

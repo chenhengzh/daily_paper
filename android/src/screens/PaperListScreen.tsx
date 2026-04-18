@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, StyleSheet, Pressable,
-  ActivityIndicator, Modal, TouchableOpacity, TextInput,
+  ActivityIndicator, Modal, TouchableOpacity, TextInput, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useQueryClient } from '@tanstack/react-query';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { usePapers } from '../hooks/usePapers';
+import { useBookmarks } from '../hooks/useBookmarks';
 import { PaperCard } from '../components/PaperCard';
 import { FilterBar } from '../components/FilterBar';
 import { useTheme } from '../hooks/useTheme';
 import { Paper } from '../types/paper';
+import { triggerPipeline, getTriggerStatus } from '../api/trigger';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Main'>;
 
@@ -19,18 +22,17 @@ function JobStatusBadge({ job, colors }: { job: any; colors: any }) {
   const statusMap: Record<string, { label: string; color: string }> = {
     pending: { label: '等待中', color: colors.text3 },
     scraping: { label: '抓取中...', color: colors.amber },
-    rating: { label: `评分中 ${job.rated_count ?? 0}/${job.scrape_count ?? 0}`, color: colors.accent },
-    done: { label: '完成', color: colors.green },
-    failed: { label: '失败', color: colors.red },
+    rating: { label: `评分 ${job.rated_count ?? 0}/${job.scrape_count ?? 0}`, color: colors.accent },
+    done: { label: '✓ 完成', color: colors.green },
+    failed: { label: '✗ 失败', color: colors.red },
   };
   const s = statusMap[job.status] ?? { label: job.status, color: colors.text3 };
-  return (
-    <Text style={[styles.jobStatus, { color: s.color }]}>{s.label}</Text>
-  );
+  return <Text style={[styles.jobStatus, { color: s.color }]}>{s.label}</Text>;
 }
 
 export function PaperListScreen({ navigation }: Props) {
   const { colors } = useTheme();
+  const queryClient = useQueryClient();
   const {
     dates, selectedDate, setSelectedDate,
     filteredPapers, fields, activeField, setActiveField,
@@ -40,11 +42,49 @@ export function PaperListScreen({ navigation }: Props) {
     loading, error, refresh,
   } = usePapers();
 
+  const { bookmarks, toggle: toggleBookmark } = useBookmarks();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [triggering, setTriggering] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const keptCount = allPapers.filter(p => p.keep).length;
   const hpCount = allPapers.filter(p => p.high_priority).length;
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  const handleTrigger = async () => {
+    Alert.alert('触发抓取', '将抓取最近5天的论文并重新评分，确认继续？', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '确认',
+        onPress: async () => {
+          try {
+            setTriggering(true);
+            await triggerPipeline(false);
+            // Poll status every 5s until done
+            pollRef.current = setInterval(async () => {
+              try {
+                const s = await getTriggerStatus();
+                if (!s.running) {
+                  clearInterval(pollRef.current!);
+                  setTriggering(false);
+                  queryClient.invalidateQueries({ queryKey: ['papers'] });
+                  queryClient.invalidateQueries({ queryKey: ['dates'] });
+                }
+              } catch {
+                clearInterval(pollRef.current!);
+                setTriggering(false);
+              }
+            }, 5000);
+          } catch (e: any) {
+            setTriggering(false);
+            Alert.alert('触发失败', e?.message || '请检查网络');
+          }
+        },
+      },
+    ]);
+  };
 
   const handleCardPress = (paper: Paper) => {
     navigation.push('Detail', { paper });
@@ -71,6 +111,17 @@ export function PaperListScreen({ navigation }: Props) {
             <Text style={[styles.iconBtn, { color: showSearch ? colors.accent : colors.text3 }]}>🔍</Text>
           </Pressable>
           <Pressable
+            onPress={handleTrigger}
+            disabled={triggering}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            {triggering ? (
+              <ActivityIndicator size="small" color={colors.accent} />
+            ) : (
+              <Text style={[styles.iconBtn, { color: colors.text3 }]}>↻</Text>
+            )}
+          </Pressable>
+          <Pressable
             onPress={() => navigation.push('Settings')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -90,8 +141,12 @@ export function PaperListScreen({ navigation }: Props) {
             placeholderTextColor={colors.text3}
             autoFocus
             returnKeyType="search"
-            clearButtonMode="while-editing"
           />
+          {searchQuery ? (
+            <Pressable onPress={() => setSearchQuery('')} style={styles.clearBtn}>
+              <Text style={{ color: colors.text3 }}>✕</Text>
+            </Pressable>
+          ) : null}
         </View>
       )}
 
@@ -106,6 +161,11 @@ export function PaperListScreen({ navigation }: Props) {
         <Text style={[styles.stat, { color: colors.text3 }]}>
           高优 <Text style={{ color: colors.amber }}>{hpCount}</Text>
         </Text>
+        {bookmarks.size > 0 && (
+          <Text style={[styles.stat, { color: colors.text3 }]}>
+            🔖 <Text style={{ color: colors.accent }}>{bookmarks.size}</Text>
+          </Text>
+        )}
         {searchQuery ? (
           <Text style={[styles.stat, { color: colors.text3 }]}>
             结果 <Text style={{ color: colors.accent }}>{filteredPapers.length}</Text>
@@ -145,7 +205,12 @@ export function PaperListScreen({ navigation }: Props) {
           data={filteredPapers}
           keyExtractor={(p) => p.arxiv_id}
           renderItem={({ item }) => (
-            <PaperCard paper={item} onPress={() => handleCardPress(item)} />
+            <PaperCard
+              paper={item}
+              onPress={() => handleCardPress(item)}
+              bookmarked={bookmarks.has(item.arxiv_id)}
+              onBookmark={() => toggleBookmark(item.arxiv_id)}
+            />
           )}
           ListHeaderComponent={renderHeader}
           contentContainerStyle={styles.list}
@@ -236,13 +301,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   searchInput: {
+    flex: 1,
     height: 38,
     borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 12,
     fontSize: 14,
+  },
+  clearBtn: {
+    padding: 4,
   },
   statsRow: {
     flexDirection: 'row',

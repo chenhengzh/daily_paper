@@ -8,9 +8,11 @@ import { ScoreBadge } from './ScoreBadge';
 interface Props {
   paper: Paper;
   onPress: () => void;
+  bookmarked?: boolean;
+  onBookmark?: () => void;
 }
 
-export function PaperCard({ paper, onPress }: Props) {
+export function PaperCard({ paper, onPress, bookmarked, onBookmark }: Props) {
   const { colors } = useTheme();
   const isHP = paper.high_priority;
   const isFiltered = !paper.keep;
@@ -34,7 +36,7 @@ export function PaperCard({ paper, onPress }: Props) {
         },
       ]}
     >
-      {/* Header row: hp badge + field chip + score */}
+      {/* Header row: hp badge + field chip + score + bookmark */}
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
           {isHP && (
@@ -46,7 +48,19 @@ export function PaperCard({ paper, onPress }: Props) {
             <TagChip label={paper.interest_field} />
           ) : null}
         </View>
-        <ScoreBadge score={paper.overall_priority_score} />
+        <View style={styles.headerRight}>
+          <ScoreBadge score={paper.overall_priority_score} />
+          {onBookmark && (
+            <Pressable
+              onPress={(e) => { e.stopPropagation(); onBookmark(); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={[styles.bookmarkIcon, { color: bookmarked ? colors.accent : colors.text3 }]}>
+                {bookmarked ? '🔖' : '📑'}
+              </Text>
+            </Pressable>
+          )}
+        </View>
       </View>
 
       {/* Title */}
@@ -102,9 +116,17 @@ const styles = StyleSheet.create({
     gap: 6,
     flex: 1,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   hpBadge: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  bookmarkIcon: {
+    fontSize: 16,
   },
   title: {
     fontSize: 15,
