@@ -28,13 +28,13 @@ def start_scheduler():
         return
     scheduler.add_job(
         _daily_job,
-        CronTrigger(hour=9, minute=30),
+        CronTrigger(hour=8, minute=30, day_of_week="mon-fri"),
         id="daily_paper_job",
         replace_existing=True,
         misfire_grace_time=3600,
     )
     scheduler.start()
-    logger.info("[scheduler] APScheduler 已启动，每天 09:30 触发")
+    logger.info("[scheduler] APScheduler 已启动，工作日每天 08:30 (CST) 触发")
 
 
 def stop_scheduler():
