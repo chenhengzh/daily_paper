@@ -1,0 +1,19 @@
+import { client } from './client';
+import { Paper, PapersResponse } from '../types/paper';
+
+export async function fetchDates(): Promise<string[]> {
+  const { data } = await client.get<string[]>('/papers/dates');
+  return Array.isArray(data) ? data : [];
+}
+
+export async function fetchPapers(date: string): Promise<PapersResponse> {
+  const { data } = await client.get<PapersResponse>('/papers/api', {
+    params: { date },
+  });
+  return data;
+}
+
+export async function fetchPaper(arxivId: string): Promise<Paper> {
+  const { data } = await client.get<Paper>(`/papers/${arxivId}`);
+  return data;
+}
