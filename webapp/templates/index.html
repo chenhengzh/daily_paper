@@ -235,7 +235,8 @@ function switchTab(tab) {
 
 // ── 论文详情 ─────────────────────────────────────────────────────────────────
 async function showDetail(arxivId) {
-  if (currentArxivId !== arxivId) {
+  const isNew = currentArxivId !== arxivId;
+  if (isNew) {
     currentArxivId = arxivId;
     chatHistory = [];
     document.getElementById('chatMessages').innerHTML = '';
@@ -256,6 +257,7 @@ async function showDetail(arxivId) {
   } catch(e) {
     body.innerHTML = '<div class="error">加载失败</div>';
   }
+  if (isNew) await loadChatHistory(arxivId);
 }
 
 function renderDetail(p) {
@@ -295,6 +297,19 @@ function renderDetail(p) {
 }
 
 // ── 聊天 ─────────────────────────────────────────────────────────────────────
+async function loadChatHistory(arxivId) {
+  try {
+    const res = await fetch(`/papers/${arxivId}/chat/history`);
+    const msgs = await res.json();
+    chatHistory = msgs.map(m => ({ role: m.role, content: m.content }));
+    const container = document.getElementById('chatMessages');
+    container.innerHTML = '';
+    for (const m of msgs) {
+      appendBubble(m.role === 'user' ? 'user' : 'ai', m.content);
+    }
+  } catch(e) {}
+}
+
 async function sendChat() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
@@ -311,17 +326,42 @@ async function sendChat() {
   const loadingId = 'bubble-loading-' + Date.now();
   appendBubble('ai', '思考中...', loadingId, true);
 
+  let collected = '';
   try {
     const res = await fetch(`/papers/${currentArxivId}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: chatHistory }),
+      body: JSON.stringify({ content: text }),
     });
-    const data = await res.json();
-    const reply = data.reply || '（无回复）';
-    chatHistory.push({ role: 'assistant', content: reply });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
     const el = document.getElementById(loadingId);
-    if (el) { el.innerHTML = renderMarkdown(reply); el.classList.remove('loading'); }
+    if (el) el.classList.remove('loading');
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.slice(6);
+        if (payload === '[DONE]') break;
+        try {
+          const chunk = JSON.parse(payload);
+          if (chunk.startsWith && chunk.startsWith('[ERROR]')) {
+            if (el) el.textContent = chunk;
+            return;
+          }
+          collected += chunk;
+          if (el) el.innerHTML = renderMarkdown(collected);
+        } catch(e) {}
+      }
+    }
+    chatHistory.push({ role: 'assistant', content: collected });
+    const msgs = document.getElementById('chatMessages');
+    msgs.scrollTop = msgs.scrollHeight;
   } catch(e) {
     const el = document.getElementById(loadingId);
     if (el) { el.textContent = '请求失败: ' + e.message; el.classList.remove('loading'); }

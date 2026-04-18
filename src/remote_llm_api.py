@@ -255,3 +255,31 @@ async def default_chat_completion_text(
         request_kwargs=request_kwargs,
         api_retries=api_retries,
     )
+
+
+from typing import AsyncGenerator
+
+async def default_chat_completion_stream(
+    *,
+    namespace: str,
+    messages: list,
+    model: Optional[str] = None,
+    max_tokens: int = 2048,
+    temperature: float = 0.2,
+) -> AsyncGenerator[str, None]:
+    """流式版本：逐 token yield 文本片段。"""
+    await _DEFAULT_RATE_LIMITER.wait()
+    client = get_default_client()
+    async with _DEFAULT_SEMAPHORE:
+        stream = await client.chat.completions.create(
+            model=str(model or _DEFAULT_CONFIG.MODEL_NAME),
+            messages=messages,
+            stream=True,
+            max_tokens=int(max_tokens),
+            temperature=float(temperature),
+            timeout=float(_DEFAULT_CONFIG.TIMEOUT_S),
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta.content if chunk.choices else None
+            if delta:
+                yield delta

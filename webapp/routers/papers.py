@@ -1,16 +1,21 @@
 import json
 import os
+import sys
 from datetime import date, datetime
 from typing import Optional
 
 from fastapi import APIRouter, Request, Depends, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from webapp.database import get_db
-from webapp.models import User, Paper, DailyJob, UserPaperResult
+from webapp.models import User, Paper, DailyJob, UserPaperResult, ChatMessage
 from webapp.auth import get_current_user
+
+_SRC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
 
 router = APIRouter()
 
@@ -270,18 +275,34 @@ async def trigger_job(
     return {"status": "triggered", "date": target_date.isoformat(), "user": user.username}
 
 
-@router.post("/{arxiv_id}/chat", response_class=JSONResponse)
+@router.get("/{arxiv_id}/chat/history", response_class=JSONResponse)
+async def paper_chat_history(arxiv_id: str, request: Request, db: Session = Depends(get_db)):
+    """获取当前用户对该论文的历史聊天记录。"""
+    user = _current_user_dep(request, db)
+    paper = db.query(Paper).filter(Paper.arxiv_id == arxiv_id).first()
+    if not paper:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    msgs = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.user_id == user.id, ChatMessage.paper_id == paper.id)
+        .order_by(ChatMessage.created_at)
+        .all()
+    )
+    return [{"role": m.role, "content": m.content} for m in msgs]
+
+
+@router.post("/{arxiv_id}/chat")
 async def paper_chat(arxiv_id: str, request: Request, db: Session = Depends(get_db)):
-    """与 LLM 讨论指定论文。Body: { messages: [{role, content}, ...] }"""
-    import sys, os
-    src_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "src")
-    if src_dir not in sys.path:
-        sys.path.insert(0, src_dir)
-    from remote_llm_api import default_chat_completion_text
+    """流式 SSE：接收用户消息，流式返回 AI 回复，并持久化对话记录。
+    Body: { "content": "用户输入的消息" }
+    """
+    from remote_llm_api import default_chat_completion_stream
 
     user = _current_user_dep(request, db)
     body = await request.json()
-    user_messages = body.get("messages", [])
+    user_content = body.get("content", "").strip()
+    if not user_content:
+        raise HTTPException(status_code=400, detail="消息不能为空")
 
     paper = db.query(Paper).filter(Paper.arxiv_id == arxiv_id).first()
     if not paper:
@@ -293,10 +314,10 @@ async def paper_chat(arxiv_id: str, request: Request, db: Session = Depends(get_
         .first()
     )
 
+    # 构建 system prompt
     authors = ", ".join(json.loads(paper.authors_json or "[]")[:5])
     tldr_zh = (result.tldr_zh or "") if result else ""
     score = f"{result.overall_priority_score:.1f}" if result and result.overall_priority_score else "N/A"
-
     system_prompt = f"""你是一个论文阅读助手。以下是读者正在阅读的论文：
 
 标题：{paper.title}
@@ -305,20 +326,59 @@ async def paper_chat(arxiv_id: str, request: Request, db: Session = Depends(get_
 中文摘要：{tldr_zh}
 综合评分：{score}
 
-请根据以上信息回答读者的问题。可以用中文回复。"""
+请根据以上信息回答读者的问题，可以用中文回复。"""
 
-    messages = [{"role": "system", "content": system_prompt}] + user_messages
+    # 加载历史记录
+    history = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.user_id == user.id, ChatMessage.paper_id == paper.id)
+        .order_by(ChatMessage.created_at)
+        .all()
+    )
+    messages = (
+        [{"role": "system", "content": system_prompt}]
+        + [{"role": m.role, "content": m.content} for m in history]
+        + [{"role": "user", "content": user_content}]
+    )
 
-    try:
-        reply = await default_chat_completion_text(
-            namespace="paper_chat",
-            messages=messages,
-            max_tokens=1024,
-            temperature=0.7,
-        )
-        return {"reply": reply}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    # 保存用户消息
+    db.add(ChatMessage(user_id=user.id, paper_id=paper.id, role="user", content=user_content))
+    db.commit()
+
+    paper_id = paper.id
+    user_id = user.id
+
+    async def stream_and_save():
+        from webapp.database import SessionLocal
+        collected = []
+        try:
+            async for chunk in default_chat_completion_stream(
+                namespace="paper_chat",
+                messages=messages,
+                max_tokens=2048,
+                temperature=0.7,
+            ):
+                collected.append(chunk)
+                # SSE 格式：data: <chunk>\n\n
+                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps('[ERROR] ' + str(e))}\n\n"
+        finally:
+            # 流结束后保存完整 AI 回复
+            full_reply = "".join(collected)
+            if full_reply:
+                save_db = SessionLocal()
+                try:
+                    save_db.add(ChatMessage(
+                        user_id=user_id, paper_id=paper_id,
+                        role="assistant", content=full_reply,
+                    ))
+                    save_db.commit()
+                finally:
+                    save_db.close()
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(stream_and_save(), media_type="text/event-stream")
 
 
 # ── 工具函数 ────────────────────────────────────────────────────────────────

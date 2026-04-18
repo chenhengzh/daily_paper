@@ -22,6 +22,7 @@ class User(Base):
     config: Mapped["UserConfig"] = relationship("UserConfig", back_populates="user", uselist=False, cascade="all, delete-orphan")
     daily_jobs: Mapped[list["DailyJob"]] = relationship("DailyJob", back_populates="user", cascade="all, delete-orphan")
     paper_results: Mapped[list["UserPaperResult"]] = relationship("UserPaperResult", back_populates="user", cascade="all, delete-orphan")
+    chat_messages: Mapped[list["ChatMessage"]] = relationship("ChatMessage", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserConfig(Base):
@@ -67,6 +68,7 @@ class Paper(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     results: Mapped[list["UserPaperResult"]] = relationship("UserPaperResult", back_populates="paper", cascade="all, delete-orphan")
+    chat_messages: Mapped[list["ChatMessage"]] = relationship("ChatMessage", back_populates="paper", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_papers_paper_date_arxiv_id", "paper_date", "arxiv_id"),
@@ -140,4 +142,22 @@ class UserPaperResult(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "paper_id", name="uq_user_paper"),
         Index("ix_user_paper_results_user_date", "user_id"),
+    )
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    paper_id: Mapped[int] = mapped_column(Integer, ForeignKey("papers.id"), nullable=False)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)  # "user" | "assistant"
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship("User", back_populates="chat_messages")
+    paper: Mapped["Paper"] = relationship("Paper", back_populates="chat_messages")
+
+    __table_args__ = (
+        Index("ix_chat_messages_user_paper", "user_id", "paper_id"),
     )
