@@ -32,8 +32,11 @@ check_env() {
 }
 
 get_lan_ip() {
+  # macOS
   ipconfig getifaddr en0 2>/dev/null || \
   ipconfig getifaddr en1 2>/dev/null || \
+  # Linux: 取第一个非 127 的 IP
+  ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}' || \
   hostname -I 2>/dev/null | awk '{print $1}' || \
   echo "127.0.0.1"
 }
@@ -93,8 +96,10 @@ start_expo() {
   lan_ip=$(get_lan_ip)
 
   log "启动 Expo 开发服务器（LAN IP: $lan_ip）..."
-  REACT_NATIVE_PACKAGER_HOSTNAME="$lan_ip" \
-    "$SCRIPT_DIR/android/node_modules/.bin/expo" start --lan --port 8081 \
+  cd "$SCRIPT_DIR/android" && \
+    REACT_NATIVE_PACKAGER_HOSTNAME="$lan_ip" \
+    EXPO_NO_DOTENV=1 \
+    ./node_modules/.bin/expo start --lan --port 8081 \
     >> "$SCRIPT_DIR/logs/expo.log" 2>&1 &
   echo $! > "$EXPO_PID_FILE"
   sleep 8
