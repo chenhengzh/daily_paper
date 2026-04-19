@@ -135,6 +135,7 @@ async def papers_api(
             "high_priority_rank": result.high_priority_rank,
             "signal_high_keywords": json.loads(result.signal_high_keywords_json or "[]"),
             "signal_notable_authors": json.loads(result.signal_notable_authors_json or "[]"),
+            "is_bookmarked": result.is_bookmarked,
         })
 
     # 按 overall_priority_score 降序
@@ -172,6 +173,49 @@ async def papers_summary(
         "daily_summary_zh": job.daily_summary_zh or "",
         "daily_ideas_zh": job.daily_ideas_zh or "",
     }
+
+
+@router.post("/{arxiv_id}/bookmark", response_class=JSONResponse)
+async def bookmark_paper(arxiv_id: str, request: Request, db: Session = Depends(get_db)):
+    user = _current_user_dep(request, db)
+    paper = db.query(Paper).filter(Paper.arxiv_id == arxiv_id).first()
+    if not paper:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    result = db.query(UserPaperResult).filter(
+        UserPaperResult.user_id == user.id, UserPaperResult.paper_id == paper.id
+    ).first()
+    if result:
+        result.is_bookmarked = True
+        db.commit()
+    return {"arxiv_id": arxiv_id, "is_bookmarked": True}
+
+
+@router.delete("/{arxiv_id}/bookmark", response_class=JSONResponse)
+async def unbookmark_paper(arxiv_id: str, request: Request, db: Session = Depends(get_db)):
+    user = _current_user_dep(request, db)
+    paper = db.query(Paper).filter(Paper.arxiv_id == arxiv_id).first()
+    if not paper:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    result = db.query(UserPaperResult).filter(
+        UserPaperResult.user_id == user.id, UserPaperResult.paper_id == paper.id
+    ).first()
+    if result:
+        result.is_bookmarked = False
+        db.commit()
+    return {"arxiv_id": arxiv_id, "is_bookmarked": False}
+
+
+@router.get("/bookmarks", response_class=JSONResponse)
+async def get_bookmarks(request: Request, db: Session = Depends(get_db)):
+    """返回当前用户所有已收藏论文的 arxiv_id 列表。"""
+    user = _current_user_dep(request, db)
+    rows = (
+        db.query(Paper.arxiv_id)
+        .join(UserPaperResult, UserPaperResult.paper_id == Paper.id)
+        .filter(UserPaperResult.user_id == user.id, UserPaperResult.is_bookmarked == True)
+        .all()
+    )
+    return [r.arxiv_id for r in rows]
 
 
 @router.get("/{arxiv_id}", response_class=JSONResponse)
@@ -219,6 +263,7 @@ async def paper_detail(arxiv_id: str, request: Request, db: Session = Depends(ge
             "signal_high_keywords": json.loads(result.signal_high_keywords_json or "[]"),
             "signal_notable_authors": json.loads(result.signal_notable_authors_json or "[]"),
             "signal_evidence_keywords": json.loads(result.signal_evidence_keywords_json or "[]"),
+            "is_bookmarked": result.is_bookmarked,
         })
     return data
 

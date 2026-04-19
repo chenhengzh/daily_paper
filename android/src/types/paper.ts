@@ -36,6 +36,7 @@ export interface Paper {
   high_priority_rank: number | null;
   signal_high_keywords: string[];
   signal_notable_authors: string[];
+  is_bookmarked: boolean;
 }
 
 export interface PapersResponse {

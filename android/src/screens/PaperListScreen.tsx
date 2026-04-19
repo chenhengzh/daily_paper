@@ -15,6 +15,7 @@ import { useTheme } from '../hooks/useTheme';
 import { Paper } from '../types/paper';
 import { triggerPipeline, getTriggerStatus } from '../api/trigger';
 
+
 type Props = NativeStackScreenProps<RootStackParamList, 'Main'>;
 
 function JobStatusBadge({ job, colors }: { job: any; colors: any }) {
@@ -42,7 +43,7 @@ export function PaperListScreen({ navigation }: Props) {
     loading, error, refresh,
   } = usePapers();
 
-  const { bookmarks, toggle: toggleBookmark } = useBookmarks();
+  const { bookmarks, toggle: toggleBookmark, setBookmarks } = useBookmarks();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [triggering, setTriggering] = useState(false);
@@ -52,6 +53,13 @@ export function PaperListScreen({ navigation }: Props) {
   const hpCount = allPapers.filter(p => p.high_priority).length;
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  // Seed bookmarks from server data whenever papers reload
+  useEffect(() => {
+    if (allPapers.length > 0) {
+      setBookmarks(new Set(allPapers.filter(p => p.is_bookmarked).map(p => p.arxiv_id)));
+    }
+  }, [allPapers]);
 
   const handleTrigger = async () => {
     Alert.alert('触发抓取', '将抓取最近5天的论文并重新评分，确认继续？', [

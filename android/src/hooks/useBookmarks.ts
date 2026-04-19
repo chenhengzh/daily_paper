@@ -1,18 +1,40 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getBookmarks, toggleBookmark } from '../storage/bookmarks';
+import { useState, useCallback } from 'react';
+import { bookmarkPaper, unbookmarkPaper } from '../api/papers';
 
-export function useBookmarks() {
-  const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    getBookmarks().then(setBookmarks);
-  }, []);
+export function useBookmarks(initialBookmarks: Set<string> = new Set()) {
+  const [bookmarks, setBookmarks] = useState<Set<string>>(initialBookmarks);
 
   const toggle = useCallback(async (arxivId: string) => {
-    await toggleBookmark(arxivId);
-    const updated = await getBookmarks();
-    setBookmarks(new Set(updated));
-  }, []);
+    const isCurrentlyBookmarked = bookmarks.has(arxivId);
+    // Optimistic update
+    setBookmarks(prev => {
+      const next = new Set(prev);
+      if (isCurrentlyBookmarked) {
+        next.delete(arxivId);
+      } else {
+        next.add(arxivId);
+      }
+      return next;
+    });
+    try {
+      if (isCurrentlyBookmarked) {
+        await unbookmarkPaper(arxivId);
+      } else {
+        await bookmarkPaper(arxivId);
+      }
+    } catch {
+      // Revert on failure
+      setBookmarks(prev => {
+        const next = new Set(prev);
+        if (isCurrentlyBookmarked) {
+          next.add(arxivId);
+        } else {
+          next.delete(arxivId);
+        }
+        return next;
+      });
+    }
+  }, [bookmarks]);
 
-  return { bookmarks, toggle };
+  return { bookmarks, toggle, setBookmarks };
 }

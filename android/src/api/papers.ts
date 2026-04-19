@@ -17,3 +17,11 @@ export async function fetchPaper(arxivId: string): Promise<Paper> {
   const { data } = await client.get<Paper>(`/papers/${arxivId}`);
   return data;
 }
+
+export async function bookmarkPaper(arxivId: string): Promise<void> {
+  await client.post(`/papers/${arxivId}/bookmark`);
+}
+
+export async function unbookmarkPaper(arxivId: string): Promise<void> {
+  await client.delete(`/papers/${arxivId}/bookmark`);
+}

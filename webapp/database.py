@@ -45,6 +45,7 @@ def init_db():
             "ALTER TABLE user_configs ADD COLUMN deemphasized_keywords_json TEXT NOT NULL DEFAULT '[]'",
             "ALTER TABLE daily_jobs ADD COLUMN input_tokens INTEGER",
             "ALTER TABLE daily_jobs ADD COLUMN output_tokens INTEGER",
+            "ALTER TABLE user_paper_results ADD COLUMN is_bookmarked BOOLEAN NOT NULL DEFAULT 0",
         ]:
             try:
                 conn.execute(__import__("sqlalchemy").text(col_def))

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, Pressable,
   LayoutAnimation, UIManager, Platform,
@@ -10,7 +10,7 @@ import { RootStackParamList } from '../navigation/RootNavigator';
 import { TagChip } from '../components/TagChip';
 import { ScoreBar } from '../components/ScoreBar';
 import { useTheme } from '../hooks/useTheme';
-import { isBookmarked, toggleBookmark } from '../storage/bookmarks';
+import { bookmarkPaper, unbookmarkPaper } from '../api/papers';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -40,15 +40,20 @@ export function PaperDetailScreen({ route, navigation }: Props) {
   const { colors } = useTheme();
   const { paper } = route.params;
   const [abstractExpanded, setAbstractExpanded] = useState(false);
-  const [bookmarked, setBookmarked] = useState(false);
-
-  useEffect(() => {
-    isBookmarked(paper.arxiv_id).then(setBookmarked);
-  }, [paper.arxiv_id]);
+  const [bookmarked, setBookmarked] = useState(paper.is_bookmarked ?? false);
 
   const handleBookmark = async () => {
-    const newVal = await toggleBookmark(paper.arxiv_id);
-    setBookmarked(newVal);
+    const next = !bookmarked;
+    setBookmarked(next);
+    try {
+      if (next) {
+        await bookmarkPaper(paper.arxiv_id);
+      } else {
+        await unbookmarkPaper(paper.arxiv_id);
+      }
+    } catch {
+      setBookmarked(!next); // revert on failure
+    }
   };
 
   const toggleAbstract = () => {

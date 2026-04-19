@@ -202,6 +202,7 @@ function paperCard(p) {
       <div class="card-links">
         <a href="https://alphaxiv.org/abs/${escHtml(p.arxiv_id || '')}" target="_blank" onclick="event.stopPropagation()">alphaXiv</a>
         ${p.pdf_url ? `<a href="${escHtml(p.pdf_url)}" target="_blank" onclick="event.stopPropagation()">PDF</a>` : ''}
+        <button class="bookmark-btn${p.is_bookmarked ? ' bookmarked' : ''}" data-id="${escHtml(p.arxiv_id || '')}" onclick="event.stopPropagation();toggleBookmark(this,'${escHtml(p.arxiv_id || '')}')" title="${p.is_bookmarked ? '取消收藏' : '收藏'}">${p.is_bookmarked ? '★' : '☆'}</button>
       </div>
     </div>
   </div>`;
@@ -256,6 +257,7 @@ function renderDetail(p) {
     <span>${p.published_date ? p.published_date.slice(0,10) : ''}</span>
     <a href="https://alphaxiv.org/abs/${escHtml(p.arxiv_id || '')}" target="_blank">alphaXiv ↗</a>
     ${p.pdf_url ? `<a href="${escHtml(p.pdf_url)}" target="_blank">PDF ↗</a>` : ''}
+    <button class="bookmark-btn${p.is_bookmarked ? ' bookmarked' : ''}" data-id="${escHtml(p.arxiv_id || '')}" onclick="toggleBookmark(this,'${escHtml(p.arxiv_id || '')}')" title="${p.is_bookmarked ? '取消收藏' : '收藏'}">${p.is_bookmarked ? '★' : '☆'}</button>
   </div>
   ${field || subfield ? `<div style="display:flex;gap:4px;flex-wrap:wrap">${field}${subfield}</div>` : ''}
   ${p.tldr_zh ? `<div class="detail-tldr">${escHtml(p.tldr_zh)}</div>` : ''}
@@ -483,6 +485,27 @@ function restorePanelWidths() {
   const rw = localStorage.getItem('dp_rw');
   if (lw !== null) document.documentElement.style.setProperty('--lw', lw + 'px');
   if (rw !== null) document.documentElement.style.setProperty('--rw', rw + 'px');
+}
+
+// ── 收藏 ─────────────────────────────────────────────────────────────────────
+async function toggleBookmark(btn, arxivId) {
+  const isBookmarked = btn.classList.contains('bookmarked');
+  const method = isBookmarked ? 'DELETE' : 'POST';
+  try {
+    const res = await fetch(`/papers/${arxivId}/bookmark`, { method });
+    if (!res.ok) return;
+    const data = await res.json();
+    const nowBookmarked = data.is_bookmarked;
+    // Update all bookmark buttons for this paper (card + detail)
+    document.querySelectorAll(`.bookmark-btn[data-id="${arxivId}"]`).forEach(b => {
+      b.classList.toggle('bookmarked', nowBookmarked);
+      b.textContent = nowBookmarked ? '★' : '☆';
+      b.title = nowBookmarked ? '取消收藏' : '收藏';
+    });
+    // Sync in-memory paper list
+    const p = allPapers.find(x => x.arxiv_id === arxivId);
+    if (p) p.is_bookmarked = nowBookmarked;
+  } catch(e) { console.error('bookmark failed', e); }
 }
 
 // ── 工具函数 ─────────────────────────────────────────────────────────────────
