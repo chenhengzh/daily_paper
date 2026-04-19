@@ -11,14 +11,15 @@ usage() {
   echo "用法: ./start.sh [选项]"
   echo ""
   echo "选项:"
-  echo "  (无参数)        启动 Web 服务（生产模式）"
-  echo "  --dev           启动 Web 服务（开发模式，文件变更自动重载）"
-  echo "  --android       启动 Expo 开发服务器（Android 调试）"
-  echo "  --all           同时启动 Web 服务和 Expo 开发服务器"
-  echo "  --stop          停止所有已启动的服务"
-  echo "  --create-admin  创建管理员账号"
-  echo "  --status        查看服务运行状态"
-  echo "  -h, --help      显示帮助"
+  echo "  (无参数)           启动 Web 服务（生产模式）"
+  echo "  --dev              启动 Web 服务（开发模式，文件变更自动重载）"
+  echo "  --android          启动 Expo 开发服务器（App 调试，development 模式）"
+  echo "  --android-prod     启动 Expo 开发服务器（App 调试，production 模式）"
+  echo "  --all              同时启动 Web 服务和 Expo 开发服务器"
+  echo "  --stop             停止所有已启动的服务"
+  echo "  --create-admin     创建管理员账号"
+  echo "  --status           查看服务运行状态"
+  echo "  -h, --help         显示帮助"
   exit 0
 }
 
@@ -76,7 +77,15 @@ start_webapp() {
   fi
 }
 
+set_app_mode() {
+  local mode="$1"  # 'development' or 'production'
+  local config="$SCRIPT_DIR/android/src/config.ts"
+  sed -i.bak "s/APP_MODE: 'production' | 'development' = '[^']*'/APP_MODE: 'production' | 'development' = '$mode'/" "$config" && rm -f "$config.bak"
+  log "App 模式已切换为: $mode"
+}
+
 start_expo() {
+  local mode="${1:-development}"
   if [ -f "$EXPO_PID_FILE" ]; then
     local pid
     pid=$(cat "$EXPO_PID_FILE")
@@ -92,10 +101,12 @@ start_expo() {
     cd "$SCRIPT_DIR"
   fi
 
+  set_app_mode "$mode"
+
   local lan_ip
   lan_ip=$(get_lan_ip)
 
-  log "启动 Expo 开发服务器（LAN IP: $lan_ip）..."
+  log "启动 Expo 开发服务器（LAN IP: $lan_ip，模式: $mode）..."
   cd "$SCRIPT_DIR/android" && \
     REACT_NATIVE_PACKAGER_HOSTNAME="$lan_ip" \
     EXPO_NO_DOTENV=1 \
@@ -211,9 +222,10 @@ print(f'管理员账号 [{username}] 创建成功')
 mkdir -p "$SCRIPT_DIR/logs"
 
 case "${1:-}" in
-  --dev)       start_webapp --dev ;;
-  --android)   start_expo ;;
-  --all)       start_webapp; start_expo ;;
+  --dev)          start_webapp --dev ;;
+  --android)      start_expo development ;;
+  --android-prod) start_expo production ;;
+  --all)          start_webapp; start_expo development ;;
   --stop)      stop_services ;;
   --status)    show_status ;;
   --create-admin) create_admin ;;

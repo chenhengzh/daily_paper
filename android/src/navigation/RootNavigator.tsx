@@ -9,9 +9,10 @@ import { PaperListScreen } from '../screens/PaperListScreen';
 import { PaperDetailScreen } from '../screens/PaperDetailScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { BookmarksScreen } from '../screens/BookmarksScreen';
-import { getServerUrl } from '../storage/settings';
+import { getServerUrl, setServerUrl } from '../storage/settings';
 import { setBaseURL, restoreCookieJar, client } from '../api/client';
 import { useTheme } from '../hooks/useTheme';
+import { APP_MODE, PRODUCTION_SERVER_URL } from '../config';
 
 export type RootStackParamList = {
   Setup: undefined;
@@ -30,7 +31,13 @@ export function RootNavigator() {
 
   useEffect(() => {
     (async () => {
-      const url = await getServerUrl();
+      let url: string | null;
+      if (APP_MODE === 'production') {
+        url = PRODUCTION_SERVER_URL;
+        await setServerUrl(PRODUCTION_SERVER_URL);
+      } else {
+        url = await getServerUrl();
+      }
       if (!url) {
         setInitialRoute('Setup');
         return;
