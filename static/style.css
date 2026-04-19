@@ -67,8 +67,9 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 }
 .nav-brand a { font-weight: 700; font-size: 16px; color: var(--text); }
 .nav-links { display: flex; align-items: center; gap: 16px; }
-.nav-links a { color: var(--text2); font-size: 14px; }
-.nav-links a.active, .nav-links a:hover { color: var(--text); }
+.nav-links a { color: var(--text2); font-size: 14px; padding: 3px 9px; border-radius: 6px; }
+.nav-links a:hover { color: var(--text); background: var(--bg3); }
+.nav-links a.active { color: var(--accent); background: var(--accentLight); font-weight: 600; }
 .nav-user { color: var(--text3); font-size: 13px; }
 .btn-link {
   background: none; border: none; color: var(--text3); cursor: pointer;

@@ -40,7 +40,7 @@
         <div id="statsDisplay"></div>
       </div>
 
-      <div class="filter-section">
+      <div class="filter-section" id="triggerSection">
         <div style="display:flex;gap:6px;align-items:center">
           <div id="jobStatus" class="job-status" style="flex:1"></div>
           <button class="btn btn-secondary btn-sm" id="triggerBtn" onclick="triggerJob()">触发</button>
@@ -86,7 +86,8 @@
 let TARGET_DATE = "{{ target_date }}";
 let allPapers = [];
 let jobInfo = null;
-let currentView = 'selected';
+let currentView = 'selected';   // 'selected' | 'all' | 'bookmarks'
+let bmSubFilter = 'all';        // 收藏视图内的子过滤：'all' | 'selected'
 let currentArxivId = null;
 
 // ── 初始化 ──────────────────────────────────────────────────────────────────
@@ -97,9 +98,13 @@ async function init() {
   const initView = urlParams.get('view');
   if (initView === 'bookmarks') {
     document.getElementById('navBookmarks').classList.add('active');
+    // 取消"论文"链接的 active（由服务端渲染，需客户端覆盖）
+    document.querySelector('.nav-links a[href="/papers"]')?.classList.remove('active');
     document.getElementById('dateSelect').value = 'all';
     currentView = 'bookmarks';
+    bmSubFilter = 'all';
     document.getElementById('btnSelected').classList.remove('active');
+    document.getElementById('btnAll').classList.add('active');
     await loadData('all');
   } else {
     await loadData(TARGET_DATE);
@@ -149,25 +154,16 @@ async function loadData(d) {
 }
 
 // ── 视图切换（精选/全部） ────────────────────────────────────────────────────
-async function setView(v) {
-  const wasBookmarks = currentView === 'bookmarks';
-  currentView = v;
+// 收藏视图下：精选/全部只控制收藏内部子过滤，不改变 currentView，不重载数据
+function setView(v) {
+  if (currentView === 'bookmarks') {
+    bmSubFilter = v;  // 'selected' 或 'all'，在收藏集内再过滤
+  } else {
+    currentView = v;
+  }
   document.getElementById('btnSelected').classList.toggle('active', v === 'selected');
   document.getElementById('btnAll').classList.toggle('active', v === 'all');
-  document.getElementById('navBookmarks').classList.remove('active');
-  if (wasBookmarks) {
-    // Switching away from bookmarks: reload the current date's full paper set
-    const sel = document.getElementById('dateSelect');
-    const d = (sel.value === 'all' || !sel.value)
-      ? sel.querySelector('option:not([value="all"])')?.value || TARGET_DATE
-      : sel.value;
-    sel.value = d;
-    TARGET_DATE = d;
-    history.pushState({date: d}, '', `/papers?date=${d}`);
-    await loadData(d);
-  } else {
-    applyFilters();
-  }
+  applyFilters();
 }
 
 // ── 筛选逻辑 ────────────────────────────────────────────────────────────────
@@ -181,6 +177,10 @@ function applyFilters() {
 
   if (currentView === 'bookmarks') {
     papers = papers.filter(p => p.is_bookmarked);
+    if (bmSubFilter === 'selected') {
+      papers = papers.filter(p => p.keep);
+      if (activeFields.size > 0) papers = papers.filter(p => !p.interest_field || activeFields.has(p.interest_field));
+    }
   } else if (currentView === 'selected') {
     papers = papers.filter(p => p.keep);
     if (activeFields.size > 0) papers = papers.filter(p => !p.interest_field || activeFields.has(p.interest_field));
@@ -326,7 +326,7 @@ function renderDetail(p) {
 function buildFieldFilters() {
   const fields = {};
   const source = currentView === 'bookmarks'
-    ? allPapers.filter(p => p.is_bookmarked)
+    ? allPapers.filter(p => p.is_bookmarked && p.keep)
     : allPapers.filter(p => p.keep);
   for (const p of source) {
     if (p.interest_field) fields[p.interest_field] = (fields[p.interest_field] || 0) + 1;
@@ -362,6 +362,9 @@ function updateCounts() {
 
 // ── 任务状态 ─────────────────────────────────────────────────────────────────
 function renderJobStatus(job) {
+  const section = document.getElementById('triggerSection');
+  if (currentView === 'bookmarks') { if (section) section.style.display = 'none'; return; }
+  if (section) section.style.display = '';
   const el = document.getElementById('jobStatus');
   if (!job) { el.innerHTML = '<span class="status-none">无记录</span>'; return; }
   const cls = {pending:'status-pending',scraping:'status-running',rating:'status-running',done:'status-done',failed:'status-failed'}[job.status] || '';
@@ -481,8 +484,9 @@ async function changeDate(d) {
   if (d === 'all') {
     history.pushState({}, '', '/papers?view=bookmarks');
     currentView = 'bookmarks';
+    bmSubFilter = 'all';
     document.getElementById('btnSelected').classList.remove('active');
-    document.getElementById('btnAll').classList.remove('active');
+    document.getElementById('btnAll').classList.add('active');
     document.getElementById('navBookmarks').classList.add('active');
     await loadData('all');
     return;
