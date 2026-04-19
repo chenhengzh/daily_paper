@@ -17,7 +17,7 @@
 daily_paper/
 ├── run_webapp.py          # 服务启动入口
 ├── start.sh               # 一键启动脚本
-├── requirements_webapp.txt
+├── requirements.txt
 ├── .env                   # 环境变量（需自行创建）
 ├── src/                   # 抓取 & 评分核心逻辑
 │   ├── scraper.py
@@ -44,7 +44,7 @@ daily_paper/
 # Python 3.10+
 conda create -n daily python=3.12
 conda activate daily
-pip install -r requirements_webapp.txt
+pip install -r requirements.txt
 ```
 
 ### 2. 配置环境变量
