@@ -62,7 +62,7 @@
   <div class="content-area">
     <div id="paperList" class="paper-list"></div>
     <div id="emptyState" class="empty-state" style="display:none">
-      <p>暂无数据。请点击"触发"手动运行，或等待每日定时任务。</p>
+      <p id="emptyMsg">暂无数据。请点击"触发"手动运行，或等待每日定时任务。</p>
     </div>
   </div>
 
@@ -155,6 +155,9 @@ function _applyBookmarksUI(isBookmarks) {
   document.getElementById('navBookmarks').classList.toggle('active', isBookmarks);
   const papersLink = document.querySelector('.nav-links a[href="/papers"]');
   if (papersLink) papersLink.classList.toggle('active', !isBookmarks);
+  document.getElementById('emptyMsg').textContent = isBookmarks
+    ? '暂无收藏'
+    : '暂无数据。请点击"触发"手动运行，或等待每日定时任务。';
 }
 
 // ── 视图切换（精选/全部） ────────────────────────────────────────────────────
