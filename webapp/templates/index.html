@@ -8,9 +8,10 @@
   <aside class="filter-panel" id="leftPanel">
     <div class="filter-panel-inner" id="leftPanelInner">
 
-      <div class="filter-section">
+      <div class="filter-section" id="dateSection">
         <h3>日期</h3>
         <select id="dateSelect" onchange="changeDate(this.value)">
+          <option value="all">全部日期</option>
           {% for d in dates %}
           <option value="{{ d }}" {% if d == target_date %}selected{% endif %}>{{ d }}</option>
           {% endfor %}
@@ -84,6 +85,7 @@
 <script>
 let TARGET_DATE = "{{ target_date }}";
 let allPapers = [];
+let bookmarkedPapers = [];  // cross-date bookmarks cache
 let jobInfo = null;
 let currentView = 'selected';
 let currentArxivId = null;
@@ -92,16 +94,26 @@ let currentArxivId = null;
 async function init() {
   initResizeHandles();
   restorePanelWidths();
-  await loadPapers(TARGET_DATE);
-  // Reconnect to any in-progress trigger job
-  try {
-    const st = await (await fetch('/papers/trigger/status')).json();
-    if (st.running) {
-      _setTriggerRunning(true);
-      _setProgress('<span class="pulse-dot"></span> 后台任务进行中...', null);
-      _readTriggerProgress();
-    }
-  } catch(e) {}
+  // 高亮 navbar 收藏链接
+  const urlParams = new URLSearchParams(window.location.search);
+  const initView = urlParams.get('view');
+  if (initView === 'bookmarks') {
+    // 收藏视图：选"全部日期"，切换视图
+    document.getElementById('dateSelect').value = 'all';
+    document.getElementById('navBookmarks').classList.add('active');
+    await setView('bookmarks');
+  } else {
+    await loadPapers(TARGET_DATE);
+    // Reconnect to any in-progress trigger job
+    try {
+      const st = await (await fetch('/papers/trigger/status')).json();
+      if (st.running) {
+        _setTriggerRunning(true);
+        _setProgress('<span class="pulse-dot"></span> 后台任务进行中...', null);
+        _readTriggerProgress();
+      }
+    } catch(e) {}
+  }
 }
 
 // ── 数据加载 ────────────────────────────────────────────────────────────────
@@ -129,16 +141,45 @@ async function loadPapers(d) {
 }
 
 
-// ── 视图切换（精选/全部） ────────────────────────────────────────────────────
-function setView(v) {
+// ── 视图切换（精选/全部/收藏） ───────────────────────────────────────────────
+async function setView(v) {
   currentView = v;
   document.getElementById('btnSelected').classList.toggle('active', v === 'selected');
   document.getElementById('btnAll').classList.toggle('active', v === 'all');
-  applyFilters();
+  // 收藏视图：日期选"全部"并隐藏日期区域；其他视图恢复
+  const dateSection = document.getElementById('dateSection');
+  if (v === 'bookmarks') {
+    document.getElementById('dateSelect').value = 'all';
+    if (dateSection) dateSection.style.display = 'none';
+    await loadBookmarks();
+  } else {
+    if (dateSection) dateSection.style.display = '';
+    // 若当前日期选的是 all，切回最近日期
+    const sel = document.getElementById('dateSelect');
+    if (sel.value === 'all') {
+      const firstDate = sel.querySelector('option:not([value="all"])');
+      if (firstDate) { sel.value = firstDate.value; TARGET_DATE = firstDate.value; }
+    }
+    applyFilters();
+  }
+}
+
+async function loadBookmarks() {
+  document.getElementById('paperList').innerHTML = '<div class="loading">加载中...</div>';
+  try {
+    const res = await fetch('/papers/bookmarks/full');
+    bookmarkedPapers = await res.json();
+    renderPapers(bookmarkedPapers);
+    updateCounts();
+    if (bookmarkedPapers.length > 0) showDetail(bookmarkedPapers[0].arxiv_id);
+  } catch(e) {
+    document.getElementById('paperList').innerHTML = '<div class="error">加载失败</div>';
+  }
 }
 
 // ── 筛选逻辑 ────────────────────────────────────────────────────────────────
 function applyFilters() {
+  if (currentView === 'bookmarks') return;  // bookmarks view managed separately
   const activeFields = new Set(
     [...document.querySelectorAll('.field-cb:checked')].map(cb => cb.value)
   );
@@ -181,6 +222,7 @@ function paperCard(p) {
   const tldr = p.tldr_zh || p.tldr || '';
   const authors = (p.authors || []).slice(0, 3).join(', ') + ((p.authors || []).length > 3 ? ' 等' : '');
   const field = p.interest_field ? `<span class="field-tag">${escHtml(p.interest_field)}</span>` : '';
+  const dateChip = (currentView === 'bookmarks' && p.paper_date) ? `<span class="date-chip">${escHtml(p.paper_date)}</span>` : '';
   const tags = (p.tags || []).slice(0, 3).map(t => `<span class="tag">${escHtml(t)}</span>`).join('');
   const filteredCls = !p.keep ? ' card-filtered' : '';
   const activeCls = p.arxiv_id === currentArxivId ? ' active' : '';
@@ -190,6 +232,7 @@ function paperCard(p) {
     <div class="card-header">
       ${hp}
       ${field}
+      ${dateChip}
       <span class="card-score" title="综合评分">${score}</span>
     </div>
     <div class="card-title">${escHtml(p.title || '')}</div>
@@ -301,13 +344,20 @@ function buildFieldFilters() {
 }
 
 function updateCounts() {
+  if (currentView === 'bookmarks') {
+    document.getElementById('statsDisplay').innerHTML =
+      `<div class="stat-item">收藏 <b>${bookmarkedPapers.length}</b></div>`;
+    return;
+  }
   const total = allPapers.length;
   const kept = allPapers.filter(p => p.keep).length;
   const hp = allPapers.filter(p => p.high_priority).length;
+  const bm = allPapers.filter(p => p.is_bookmarked).length;
   document.getElementById('statsDisplay').innerHTML =
     `<div class="stat-item">总计 <b>${total}</b></div>
      <div class="stat-item">精选 <b>${kept}</b></div>
-     <div class="stat-item">高优 <b>${hp}</b></div>`;
+     <div class="stat-item">高优 <b>${hp}</b></div>
+     ${bm > 0 ? `<div class="stat-item">★ <b>${bm}</b></div>` : ''}`;
 }
 
 // ── 任务状态 ─────────────────────────────────────────────────────────────────
@@ -427,8 +477,19 @@ async function triggerJob() {
 
 // ── 日期切换 ─────────────────────────────────────────────────────────────────
 async function changeDate(d) {
+  if (d === 'all') {
+    history.pushState({}, '', '/papers?view=bookmarks');
+    await setView('bookmarks');
+    return;
+  }
   TARGET_DATE = d;
   history.pushState({date: d}, '', `/papers?date=${d}`);
+  if (currentView === 'bookmarks') {
+    currentView = 'selected';
+    document.getElementById('btnSelected').classList.add('active');
+    document.getElementById('btnAll').classList.remove('active');
+    document.getElementById('dateSection').style.display = '';
+  }
   await loadPapers(d);
   await loadSummary(d);
 }
@@ -502,9 +563,22 @@ async function toggleBookmark(btn, arxivId) {
       b.textContent = nowBookmarked ? '★' : '☆';
       b.title = nowBookmarked ? '取消收藏' : '收藏';
     });
-    // Sync in-memory paper list
+    // Sync in-memory lists
     const p = allPapers.find(x => x.arxiv_id === arxivId);
     if (p) p.is_bookmarked = nowBookmarked;
+    // In bookmarks view: remove card immediately when unbookmarked
+    if (currentView === 'bookmarks' && !nowBookmarked) {
+      bookmarkedPapers = bookmarkedPapers.filter(x => x.arxiv_id !== arxivId);
+      renderPapers(bookmarkedPapers);
+      updateCounts();
+      // Show next paper or clear detail
+      if (currentArxivId === arxivId) {
+        currentArxivId = null;
+        if (bookmarkedPapers.length > 0) showDetail(bookmarkedPapers[0].arxiv_id);
+        else document.getElementById('detailBody').innerHTML = '<div style="color:var(--text3);text-align:center;padding:40px 0;font-size:13px">收藏夹为空</div>';
+      }
+    }
+    updateCounts();
   } catch(e) { console.error('bookmark failed', e); }
 }
 

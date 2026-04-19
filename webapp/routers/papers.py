@@ -218,6 +218,51 @@ async def get_bookmarks(request: Request, db: Session = Depends(get_db)):
     return [r.arxiv_id for r in rows]
 
 
+@router.get("/bookmarks/full", response_class=JSONResponse)
+async def get_bookmarks_full(request: Request, db: Session = Depends(get_db)):
+    """返回当前用户所有已收藏论文的完整数据，按收藏时间倒序（最近的在前）。"""
+    user = _current_user_dep(request, db)
+    rows = (
+        db.query(UserPaperResult, Paper)
+        .join(Paper, UserPaperResult.paper_id == Paper.id)
+        .filter(UserPaperResult.user_id == user.id, UserPaperResult.is_bookmarked == True)
+        .order_by(Paper.paper_date.desc(), UserPaperResult.overall_priority_score.desc())
+        .all()
+    )
+    papers = []
+    for result, paper in rows:
+        papers.append({
+            "arxiv_id": paper.arxiv_id,
+            "title": paper.title,
+            "summary": paper.summary,
+            "url": paper.abs_url or paper.url,
+            "pdf_url": paper.pdf_url,
+            "authors": json.loads(paper.authors_json or "[]"),
+            "categories": json.loads(paper.categories_json or "[]"),
+            "published_date": paper.published_date.isoformat() if paper.published_date else None,
+            "paper_date": paper.paper_date.isoformat(),
+            "keep": result.keep,
+            "keep_reason": result.keep_reason,
+            "interest_field": result.interest_field,
+            "interest_subfield": result.interest_subfield,
+            "tldr": result.tldr,
+            "tldr_zh": result.tldr_zh,
+            "tags": json.loads(result.tags_json or "[]"),
+            "relevance_score": result.relevance_score,
+            "quality_score": result.quality_score,
+            "novelty_claim_score": result.novelty_claim_score,
+            "impact_score": result.potential_impact_score,
+            "overall_priority_score": result.overall_priority_score,
+            "tier": result.tier,
+            "high_priority": result.high_priority,
+            "high_priority_rank": result.high_priority_rank,
+            "signal_high_keywords": json.loads(result.signal_high_keywords_json or "[]"),
+            "signal_notable_authors": json.loads(result.signal_notable_authors_json or "[]"),
+            "is_bookmarked": True,
+        })
+    return papers
+
+
 @router.get("/{arxiv_id}", response_class=JSONResponse)
 async def paper_detail(arxiv_id: str, request: Request, db: Session = Depends(get_db)):
     user = _current_user_dep(request, db)
