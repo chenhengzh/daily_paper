@@ -226,7 +226,7 @@ async def get_bookmarks_full(request: Request, db: Session = Depends(get_db)):
         db.query(UserPaperResult, Paper)
         .join(Paper, UserPaperResult.paper_id == Paper.id)
         .filter(UserPaperResult.user_id == user.id, UserPaperResult.is_bookmarked == True)
-        .order_by(Paper.paper_date.desc(), UserPaperResult.overall_priority_score.desc())
+        .order_by(UserPaperResult.overall_priority_score.desc())
         .all()
     )
     papers = []
