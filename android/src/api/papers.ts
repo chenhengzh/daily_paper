@@ -18,6 +18,11 @@ export async function fetchPaper(arxivId: string): Promise<Paper> {
   return data;
 }
 
+export async function fetchBookmarksFull(): Promise<Paper[]> {
+  const { data } = await client.get<Paper[]>('/papers/bookmarks/full');
+  return Array.isArray(data) ? data : [];
+}
+
 export async function bookmarkPaper(arxivId: string): Promise<void> {
   await client.post(`/papers/${arxivId}/bookmark`);
 }

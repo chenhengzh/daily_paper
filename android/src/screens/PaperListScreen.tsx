@@ -113,6 +113,12 @@ export function PaperListScreen({ navigation }: Props) {
             </Text>
           </Pressable>
           <Pressable
+            onPress={() => navigation.push('Bookmarks')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={[styles.iconBtn, { color: bookmarks.size > 0 ? colors.amber : colors.text3 }]}>🔖</Text>
+          </Pressable>
+          <Pressable
             onPress={() => setShowSearch(v => !v)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >

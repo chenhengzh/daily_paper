@@ -8,6 +8,7 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { PaperListScreen } from '../screens/PaperListScreen';
 import { PaperDetailScreen } from '../screens/PaperDetailScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { BookmarksScreen } from '../screens/BookmarksScreen';
 import { getServerUrl } from '../storage/settings';
 import { setBaseURL, restoreCookieJar, client } from '../api/client';
 import { useTheme } from '../hooks/useTheme';
@@ -18,6 +19,7 @@ export type RootStackParamList = {
   Main: undefined;
   Detail: { paper: Paper };
   Settings: undefined;
+  Bookmarks: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -100,6 +102,11 @@ export function RootNavigator() {
           name="Settings"
           component={SettingsScreen}
           options={{ title: '设置', headerBackTitle: '返回' }}
+        />
+        <Stack.Screen
+          name="Bookmarks"
+          component={BookmarksScreen}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>
