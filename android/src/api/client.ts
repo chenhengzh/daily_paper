@@ -1,18 +1,15 @@
 import axios from 'axios';
-import { wrapper } from 'axios-cookiejar-support';
-import { CookieJar } from 'tough-cookie';
-import { getCookieJarJson, setCookieJarJson, clearCookieJar } from '../storage/settings';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const jar = new CookieJar();
+const COOKIE_KEY = 'dp_cookies';
 
-export const client = wrapper(
-  axios.create({
-    jar,
-    withCredentials: true,
-    timeout: 30000,
-    maxRedirects: 5,
-  })
-);
+// In-memory cookie store: { [name]: value }
+let cookieStore: Record<string, string> = {};
+
+export const client = axios.create({
+  timeout: 30000,
+  maxRedirects: 0,
+});
 
 let _baseURL = '';
 
@@ -25,41 +22,58 @@ export function getBaseURL(): string {
   return _baseURL;
 }
 
-// Persist cookie jar after every response
+// Attach cookies to every request
+client.interceptors.request.use((config) => {
+  const cookieHeader = Object.entries(cookieStore)
+    .map(([k, v]) => `${k}=${v}`)
+    .join('; ');
+  if (cookieHeader) {
+    config.headers = config.headers ?? {};
+    config.headers['Cookie'] = cookieHeader;
+  }
+  return config;
+});
+
+// Parse and persist Set-Cookie from every response
 client.interceptors.response.use(
   async (response) => {
-    try {
-      await setCookieJarJson(JSON.stringify(jar.toJSON()));
-    } catch {}
+    await _extractCookies(response);
     return response;
   },
   async (error) => {
-    try {
-      await setCookieJarJson(JSON.stringify(jar.toJSON()));
-    } catch {}
+    if (error.response) {
+      await _extractCookies(error.response);
+    }
     return Promise.reject(error);
   }
 );
 
+async function _extractCookies(response: any) {
+  try {
+    const setCookie: string | string[] | undefined =
+      response.headers['set-cookie'];
+    if (!setCookie) return;
+    const cookies = Array.isArray(setCookie) ? setCookie : [setCookie];
+    for (const raw of cookies) {
+      const part = raw.split(';')[0].trim();
+      const eq = part.indexOf('=');
+      if (eq < 0) continue;
+      const name = part.slice(0, eq).trim();
+      const value = part.slice(eq + 1).trim();
+      if (name) cookieStore[name] = value;
+    }
+    await AsyncStorage.setItem(COOKIE_KEY, JSON.stringify(cookieStore));
+  } catch {}
+}
+
 export async function restoreCookieJar(): Promise<void> {
   try {
-    const saved = await getCookieJarJson();
-    if (!saved) return;
-    const parsed = JSON.parse(saved);
-    const cookies: any[] = parsed.cookies || [];
-    for (const c of cookies) {
-      if (c.key && c.value && c.domain) {
-        const proto = c.secure ? 'https' : 'http';
-        const url = `${proto}://${c.domain}${c.path || '/'}`;
-        try {
-          await jar.setCookie(`${c.key}=${c.value}`, url);
-        } catch {}
-      }
-    }
+    const saved = await AsyncStorage.getItem(COOKIE_KEY);
+    if (saved) cookieStore = JSON.parse(saved);
   } catch {}
 }
 
 export async function clearSession(): Promise<void> {
-  jar.removeAllCookiesSync();
-  await clearCookieJar();
+  cookieStore = {};
+  await AsyncStorage.removeItem(COOKIE_KEY);
 }

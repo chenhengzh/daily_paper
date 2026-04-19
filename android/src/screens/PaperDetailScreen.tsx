@@ -186,7 +186,7 @@ export function PaperDetailScreen({ route, navigation }: Props) {
         <SectionDivider label="原文摘要" colors={colors} />
         <Pressable onPress={toggleAbstract} style={styles.collapseToggle}>
           <Text style={[styles.collapseText, { color: colors.accent }]}>
-            {abstractExpanded ? '▾ 收起' : '▸ 展开英文原文'}
+            {abstractExpanded ? '▾ 收起' : '▸ 原始摘要'}
           </Text>
         </Pressable>
         {abstractExpanded && (

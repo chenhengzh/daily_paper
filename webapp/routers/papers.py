@@ -124,6 +124,7 @@ async def papers_api(
             "interest_subfield": result.interest_subfield,
             "tldr": result.tldr,
             "tldr_zh": result.tldr_zh,
+            "summary_zh": result.summary_zh,
             "tags": json.loads(result.tags_json or "[]"),
             "relevance_score": result.relevance_score,
             "quality_score": result.quality_score,
