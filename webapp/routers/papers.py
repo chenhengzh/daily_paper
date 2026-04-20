@@ -30,7 +30,11 @@ _trigger_done: dict[int, bool] = {}
 def _tmpl(request, name, ctx=None, **kwargs):
     ctx = ctx or {}
     ctx["request"] = request
-    return templates.TemplateResponse(request=request, name=name, context=ctx, **kwargs)
+    resp = templates.TemplateResponse(request=request, name=name, context=ctx, **kwargs)
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 def _current_user_dep(request: Request, db: Session = Depends(get_db)) -> User:

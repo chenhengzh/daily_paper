@@ -68,6 +68,19 @@ app.include_router(config_router.router, prefix="/config", tags=["config"])
 app.include_router(admin_router.router, prefix="/admin", tags=["admin"])
 app.include_router(logs_router.router, prefix="/logs", tags=["logs"])
 
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+
+class NoCacheMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response = await call_next(request)
+        if "text/html" in response.headers.get("content-type", ""):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
+app.add_middleware(NoCacheMiddleware)
+
 
 from fastapi.responses import RedirectResponse
 

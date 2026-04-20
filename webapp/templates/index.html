@@ -11,7 +11,6 @@
       <div class="filter-section" id="dateSection">
         <h3>日期</h3>
         <select id="dateSelect" onchange="changeDate(this.value)">
-          <option value="all">全部日期</option>
           {% for d in dates %}
           <option value="{{ d }}" {% if d == target_date %}selected{% endif %}>{{ d }}</option>
           {% endfor %}
@@ -91,13 +90,17 @@ let currentArxivId = null;
 
 // ── 初始化 ──────────────────────────────────────────────────────────────────
 async function init() {
+  // 清除浏览器缓存可能残留的"全部日期"选项
+  const sel = document.getElementById('dateSelect');
+  if (sel) {
+    Array.from(sel.options).forEach(o => { if (o.value === 'all') o.remove(); });
+  }
   initResizeHandles();
   restorePanelWidths();
   const urlParams = new URLSearchParams(window.location.search);
   const initView = urlParams.get('view');
   if (initView === 'bookmarks') {
     currentView = 'bookmarks';
-    document.getElementById('dateSelect').value = 'all';
     _applyBookmarksUI(true);
     await loadData('all');
   } else {
@@ -450,9 +453,7 @@ async function _refreshDateSelect() {
     const sel = document.getElementById('dateSelect');
     if (!sel) return;
     const cur = sel.value;
-    sel.innerHTML = '<option value="all">全部日期</option>' +
-      dates.map(d => `<option value="${d}"${d === TARGET_DATE ? ' selected' : ''}>${d}</option>`).join('');
-    if (cur === 'all') sel.value = 'all';
+    sel.innerHTML = dates.map(d => `<option value="${d}"${d === TARGET_DATE ? ' selected' : ''}>${d}</option>`).join('');
   } catch(e) {}
 }
 
@@ -476,13 +477,7 @@ async function triggerJob() {
 
 // ── 日期切换 ─────────────────────────────────────────────────────────────────
 async function changeDate(d) {
-  if (d === 'all') {
-    history.pushState({}, '', '/papers?view=bookmarks');
-    currentView = 'bookmarks';
-    _applyBookmarksUI(true);
-    await loadData('all');
-    return;
-  }
+  if (!d || d === 'all') return;
   TARGET_DATE = d;
   history.pushState({date: d}, '', `/papers?date=${d}`);
   if (currentView === 'bookmarks') {
