@@ -22,10 +22,12 @@ async def _check_and_trigger():
     try:
         users = db.query(User).filter(User.is_active == True).all()
         for user in users:
+            if user.username == "admin":
+                continue
             cfg = db.query(UserConfig).filter(UserConfig.user_id == user.id).first()
             auto_trigger = cfg.auto_trigger if cfg and cfg.auto_trigger is not None else True
-            trigger_hour = cfg.trigger_hour if cfg and cfg.trigger_hour is not None else 9
-            trigger_minute = cfg.trigger_minute if cfg and cfg.trigger_minute is not None else 30
+            trigger_hour = cfg.trigger_hour if cfg and cfg.trigger_hour is not None else 18
+            trigger_minute = cfg.trigger_minute if cfg and cfg.trigger_minute is not None else 0
 
             if not auto_trigger:
                 continue

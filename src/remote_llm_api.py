@@ -51,6 +51,17 @@ def _env_int(name: str, default: int) -> int:
         return int(default)
 
 
+def _parse_api_keys() -> list[str]:
+    """解析 OPENAI_API_KEYS（逗号分隔多 key）或回退到 OPENAI_API_KEY / AZURE_API_KEY。"""
+    multi = os.getenv("OPENAI_API_KEYS", "")
+    if multi:
+        keys = [k.strip() for k in multi.split(",") if k.strip()]
+        if keys:
+            return keys
+    single = os.getenv("OPENAI_API_KEY", os.getenv("AZURE_API_KEY", ""))
+    return [single] if single else []
+
+
 @dataclass(frozen=True)
 class RemoteLLMConfig:
     # API 类型："openai"（默认，标准兼容网关）或 "azure"
@@ -68,46 +79,52 @@ class RemoteLLMConfig:
     API_VERSION: str = os.getenv("AZURE_API_VERSION", "2024-03-01-preview")
 
     # IMPORTANT: 不要在代码里硬编码 Key。请通过环境变量注入。
+    # 多 key 时用 OPENAI_API_KEYS（逗号分隔），单 key 用 OPENAI_API_KEY / AZURE_API_KEY。
     AZURE_API_KEY: str = os.getenv("AZURE_API_KEY", os.getenv("OPENAI_API_KEY", ""))
 
-    MODEL_NAME: str = os.getenv("AZURE_MODEL_NAME", os.getenv("OPENAI_MODEL_NAME", "deepseek-v3.2-huawei"))
+    MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", os.getenv("AZURE_MODEL_NAME", os.getenv("OPENAI_MODEL_NAME", "deepseek-v3.2-huawei")))
 
     # --- 核心超参 ---
-    QPM: int = _env_int("AZURE_QPM", 30)
-    MAX_CONCURRENCY: int = _env_int("AZURE_MAX_CONCURRENCY", 8)
+    QPM: int = _env_int("LLM_QPM", _env_int("AZURE_QPM", 30))
+    # MAX_CONCURRENCY 为单 key 并发数；多 key 时总并发 = MAX_CONCURRENCY * key 数量
+    MAX_CONCURRENCY: int = _env_int("LLM_MAX_CONCURRENCY", _env_int("AZURE_MAX_CONCURRENCY", 8))
     # 网络/SDK timeout（秒）。同时会用 asyncio.wait_for 兜底。
-    TIMEOUT_S: float = _env_float("AZURE_TIMEOUT_S", 120.0)
+    TIMEOUT_S: float = _env_float("LLM_TIMEOUT_S", _env_float("AZURE_TIMEOUT_S", 120.0))
     # 重试与退避
-    API_RETRIES: int = _env_int("AZURE_API_RETRIES", 6)
-    BACKOFF_INITIAL_S: float = _env_float("AZURE_BACKOFF_INITIAL_S", 1.0)
-    BACKOFF_MAX_S: float = _env_float("AZURE_BACKOFF_MAX_S", 120.0)
+    API_RETRIES: int = _env_int("LLM_API_RETRIES", _env_int("AZURE_API_RETRIES", 6))
+    BACKOFF_INITIAL_S: float = _env_float("LLM_BACKOFF_INITIAL_S", _env_float("AZURE_BACKOFF_INITIAL_S", 1.0))
+    BACKOFF_MAX_S: float = _env_float("LLM_BACKOFF_MAX_S", _env_float("AZURE_BACKOFF_MAX_S", 120.0))
 
 
 class AsyncQpmRateLimiter:
-    """一个简单的 QPM 限流器：通过强制最小间隔实现。
+    """令牌桶限流器：允许突发，QPM 为每分钟总配额。
 
     - 对外只暴露 `wait()`
-    - 支持并发调用（内部用 lock 串行分配时间片）
+    - 桶满时最多积累 QPM 个令牌，空时等待补充
     """
 
     def __init__(self, qpm: int):
         qpm = int(qpm)
         if qpm <= 0:
             raise ValueError(f"qpm must be positive, got {qpm}")
-        self._min_interval_s = 60.0 / float(qpm)
+        self._rate = float(qpm) / 60.0  # 每秒补充令牌数
+        self._capacity = float(qpm)     # 桶容量 = 1分钟配额
+        self._tokens = float(qpm)       # 初始满桶
+        self._last_refill = time.monotonic()
         self._lock = asyncio.Lock()
-        self._next_allowed_ts = 0.0
 
     async def wait(self) -> None:
-        delay = 0.0
-        async with self._lock:
-            now = time.monotonic()
-            if self._next_allowed_ts <= 0.0:
-                self._next_allowed_ts = now
-            delay = max(0.0, self._next_allowed_ts - now)
-            self._next_allowed_ts = max(self._next_allowed_ts, now) + self._min_interval_s
-        if delay > 0:
-            await asyncio.sleep(delay)
+        while True:
+            async with self._lock:
+                now = time.monotonic()
+                elapsed = now - self._last_refill
+                self._tokens = min(self._capacity, self._tokens + elapsed * self._rate)
+                self._last_refill = now
+                if self._tokens >= 1.0:
+                    self._tokens -= 1.0
+                    return
+                wait_s = (1.0 - self._tokens) / self._rate
+            await asyncio.sleep(wait_s)
 
 
 def _supports_reasoning_effort(model: str) -> bool:
@@ -119,29 +136,48 @@ def _supports_reasoning_effort(model: str) -> bool:
     return m.startswith("o1") or m.startswith("o3")
 
 
-def build_default_client(config: RemoteLLMConfig) -> AsyncOpenAI | AsyncAzureOpenAI:
-    if not config.AZURE_API_KEY:
+def build_client(config: RemoteLLMConfig, api_key: str) -> AsyncOpenAI | AsyncAzureOpenAI:
+    if not api_key:
         raise RuntimeError(
-            "Missing API key: set `OPENAI_API_KEY` (or `AZURE_API_KEY`) for remote LLM calls."
+            "Missing API key: set `OPENAI_API_KEYS` or `OPENAI_API_KEY` for remote LLM calls."
         )
     if config.API_TYPE == "azure":
         return AsyncAzureOpenAI(
             azure_endpoint=config.AZURE_ENDPOINT,
-            api_key=config.AZURE_API_KEY,
+            api_key=api_key,
             api_version=config.API_VERSION,
         )
     else:
-        # 标准 OpenAI-compatible 网关
         return AsyncOpenAI(
             base_url=config.OPENAI_BASE_URL,
-            api_key=config.AZURE_API_KEY,
+            api_key=api_key,
         )
+
+
+def build_default_client(config: RemoteLLMConfig) -> AsyncOpenAI | AsyncAzureOpenAI:
+    return build_client(config, config.AZURE_API_KEY)
 
 
 _DEFAULT_CONFIG = RemoteLLMConfig()
 _DEFAULT_RATE_LIMITER = AsyncQpmRateLimiter(_DEFAULT_CONFIG.QPM)
-_DEFAULT_SEMAPHORE = asyncio.Semaphore(_DEFAULT_CONFIG.MAX_CONCURRENCY)
+
+# 多 key pool：每个 key 对应一个独立 client；总并发 = MAX_CONCURRENCY * key 数量
+_API_KEYS: list[str] = _parse_api_keys()
+_KEY_CLIENTS: list[AsyncOpenAI | AsyncAzureOpenAI] = []
+_DEFAULT_SEMAPHORE = asyncio.Semaphore(
+    _DEFAULT_CONFIG.MAX_CONCURRENCY * max(len(_API_KEYS), 1)
+)
 _DEFAULT_CLIENT: AsyncOpenAI | AsyncAzureOpenAI | None = None
+
+
+def _get_random_client() -> AsyncOpenAI | AsyncAzureOpenAI:
+    """从 key pool 中随机选一个 client；pool 未初始化则回退到单 client。"""
+    global _KEY_CLIENTS
+    if not _KEY_CLIENTS:
+        _KEY_CLIENTS = [build_client(_DEFAULT_CONFIG, k) for k in _API_KEYS if k]
+    if _KEY_CLIENTS:
+        return random.choice(_KEY_CLIENTS)
+    return get_default_client()
 
 
 def get_default_client() -> AsyncOpenAI | AsyncAzureOpenAI:
@@ -248,7 +284,7 @@ async def default_chat_completion_text(
 
     return await chat_completion_text(
         namespace=namespace,
-        client=get_default_client(),
+        client=_get_random_client(),
         rate_limiter=_DEFAULT_RATE_LIMITER,
         llm_semaphore=_DEFAULT_SEMAPHORE,
         model=str(model or _DEFAULT_CONFIG.MODEL_NAME),
@@ -273,7 +309,7 @@ async def default_chat_completion_stream(
 ) -> AsyncGenerator[str, None]:
     """流式版本：逐 token yield 文本片段。"""
     await _DEFAULT_RATE_LIMITER.wait()
-    client = get_default_client()
+    client = _get_random_client()
     async with _DEFAULT_SEMAPHORE:
         stream = await client.chat.completions.create(
             model=str(model or _DEFAULT_CONFIG.MODEL_NAME),

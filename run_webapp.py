@@ -8,8 +8,10 @@
 环境变量（可选）：
   SECRET_KEY         Session 加密密钥（不设则每次启动随机生成）
   AZURE_API_KEY      LLM API Key（或 OPENAI_API_KEY）
-  AZURE_ENDPOINT     LLM API Endpoint
-  AZURE_MODEL_NAME   模型名称
+  AZURE_ENDPOINT     LLM API Endpoint（Azure 模式）
+  LLM_MODEL_NAME     模型名称（也接受旧名 AZURE_MODEL_NAME）
+  LLM_QPM            每分钟请求上限（也接受旧名 AZURE_QPM）
+  LLM_MAX_CONCURRENCY 最大并发数（也接受旧名 AZURE_MAX_CONCURRENCY）
 """
 import os
 import sys

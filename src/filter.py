@@ -505,7 +505,7 @@ def rate_papers(papers: list, interests: Optional[str] = None) -> list:
 
     依赖环境变量：
     - `AZURE_API_KEY`（或 `OPENAI_API_KEY`）
-    - 可选：`AZURE_ENDPOINT` / `AZURE_MODEL_NAME` / `AZURE_QPM` 等
+    - 可选：`AZURE_ENDPOINT` / `LLM_MODEL_NAME` / `LLM_QPM` 等
     """
     interests = interests or ""
     logging.info(f"开始对 {len(papers)} 篇论文做粗筛与评分...")

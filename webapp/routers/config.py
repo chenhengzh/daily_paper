@@ -136,8 +136,8 @@ def _serialize_config(cfg: UserConfig | None) -> dict:
             "max_results": 800,
             "high_priority_target": 15,
             "auto_trigger": True,
-            "trigger_hour": 9,
-            "trigger_minute": 30,
+            "trigger_hour": 18,
+            "trigger_minute": 0,
         }
     return {
         "keywords": json.loads(cfg.keywords_json or "[]"),
@@ -152,6 +152,6 @@ def _serialize_config(cfg: UserConfig | None) -> dict:
         "max_results": cfg.max_results,
         "high_priority_target": cfg.high_priority_target,
         "auto_trigger": cfg.auto_trigger if cfg.auto_trigger is not None else True,
-        "trigger_hour": cfg.trigger_hour if cfg.trigger_hour is not None else 9,
-        "trigger_minute": cfg.trigger_minute if cfg.trigger_minute is not None else 30,
+        "trigger_hour": cfg.trigger_hour if cfg.trigger_hour is not None else 18,
+        "trigger_minute": cfg.trigger_minute if cfg.trigger_minute is not None else 0,
     }

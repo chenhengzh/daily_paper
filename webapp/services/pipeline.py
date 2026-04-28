@@ -93,9 +93,11 @@ async def rate_papers_for_user(
     # 当本函数通过 asyncio.run() 在后台线程中运行时，模块级别的 Semaphore/Lock
     # 是在主线程的事件循环中创建的，直接使用会报错。
     import src.remote_llm_api as llm_mod
-    llm_mod._DEFAULT_SEMAPHORE = asyncio.Semaphore(llm_mod._DEFAULT_CONFIG.MAX_CONCURRENCY)
-    llm_mod._DEFAULT_RATE_LIMITER = llm_mod.AsyncQpmRateLimiter(llm_mod._DEFAULT_CONFIG.QPM)
-    llm_mod._DEFAULT_CLIENT = None  # 强制重建 client（AsyncOpenAI 也绑定了事件循环）
+    n_keys = max(len(llm_mod._API_KEYS), 1)
+    llm_mod._DEFAULT_SEMAPHORE = asyncio.Semaphore(llm_mod._DEFAULT_CONFIG.MAX_CONCURRENCY * n_keys)
+    llm_mod._DEFAULT_RATE_LIMITER = llm_mod.AsyncQpmRateLimiter(llm_mod._DEFAULT_CONFIG.QPM * n_keys)
+    llm_mod._DEFAULT_CLIENT = None
+    llm_mod._KEY_CLIENTS = []  # 强制重建所有 client（AsyncOpenAI 绑定事件循环）
 
     db = SessionLocal()
     try:
@@ -188,6 +190,7 @@ async def rate_papers_for_user(
             else:
                 _os.environ.pop("OPENAI_MODEL_NAME", None)
             llm_mod._DEFAULT_CLIENT = None
+            llm_mod._KEY_CLIENTS = []
             llm_mod._DEFAULT_SEMAPHORE = asyncio.Semaphore(llm_mod._DEFAULT_CONFIG.MAX_CONCURRENCY)
             llm_mod._DEFAULT_RATE_LIMITER = llm_mod.AsyncQpmRateLimiter(llm_mod._DEFAULT_CONFIG.QPM)
 
@@ -295,6 +298,7 @@ async def rate_papers_for_user(
                     else:
                         _os.environ[k] = _saved_env[k]
                 llm_mod._DEFAULT_CLIENT = None
+                llm_mod._KEY_CLIENTS = []
 
         # 全部完成后做 high_priority 标记并更新
         rated = mark_high_priority(rated)

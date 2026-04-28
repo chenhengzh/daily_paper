@@ -49,8 +49,8 @@ class UserConfig(Base):
     max_results: Mapped[int] = mapped_column(Integer, default=800)
     high_priority_target: Mapped[int] = mapped_column(Integer, default=15)
     auto_trigger: Mapped[bool] = mapped_column(Boolean, default=True)
-    trigger_hour: Mapped[int] = mapped_column(Integer, default=9)
-    trigger_minute: Mapped[int] = mapped_column(Integer, default=30)
+    trigger_hour: Mapped[int] = mapped_column(Integer, default=18)
+    trigger_minute: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user: Mapped["User"] = relationship("User", back_populates="config")

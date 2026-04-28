@@ -18,7 +18,7 @@ daily_paper/
 ├── run_webapp.py          # 服务启动入口
 ├── start.sh               # 一键启动脚本
 ├── requirements.txt
-├── .env                   # 环境变量（需自行创建）
+├── .env                   # 环境变量（需自行创建，见下方）
 ├── src/                   # 抓取 & 评分核心逻辑
 │   ├── scraper.py
 │   ├── filter.py
@@ -38,10 +38,9 @@ daily_paper/
 
 ## 快速开始
 
-### 1. 环境准备
+### 1. 安装依赖
 
 ```bash
-# Python 3.10+
 conda create -n daily python=3.12
 conda activate daily
 pip install -r requirements.txt
@@ -49,33 +48,39 @@ pip install -r requirements.txt
 
 ### 2. 配置环境变量
 
-复制模板并填写：
-
 ```bash
 cp .env.example .env
+# 编辑 .env，填写必填项
 ```
 
-`.env` 内容说明：
+**`.env` 完整说明：**
 
 ```bash
-# LLM API（必填）
-OPENAI_API_TYPE=openai          # openai 或 azure
-OPENAI_BASE_URL=https://...     # OpenAI-compatible 网关地址
-OPENAI_API_KEY=sk-...           # API Key
-AZURE_MODEL_NAME=gpt-4o         # 模型名称
+# ── LLM API（必填）──────────────────────────────────────
+OPENAI_API_TYPE=openai               # openai（默认）或 azure
+OPENAI_BASE_URL=https://api.openai.com/v1  # OpenAI-compatible 网关地址
 
-# 可选：Azure 模式
-# OPENAI_API_TYPE=azure
-# AZURE_ENDPOINT=https://...
-# AZURE_API_KEY=...
+# 单个 Key
+OPENAI_API_KEY=sk-...
+
+# 多个 Key（逗号分隔）；配置后 OPENAI_API_KEY 可省略
+# 总并发 = LLM_MAX_CONCURRENCY × key 数量
+# OPENAI_API_KEYS=sk-key1,sk-key2,sk-key3
+
+# ── Azure 模式（OPENAI_API_TYPE=azure 时填写）───────────
+# AZURE_ENDPOINT=https://your-resource.openai.azure.com
+# AZURE_API_KEY=your-azure-key
 # AZURE_API_VERSION=2024-03-01-preview
 
-# Session 加密密钥（不填则每次启动随机生成，重启后需重新登录）
-SECRET_KEY=your-secret-key-here
+# ── 模型与限流──────────────────────────────────────────
+LLM_MODEL_NAME=gpt-4o        # 模型名称
+LLM_QPM=20                   # 单个 Key 每分钟请求上限（多 Key 时自动 × key 数量）
+LLM_MAX_CONCURRENCY=16       # 单个 Key 最大并发数
+# LLM_TIMEOUT_S=120          # 单次请求超时（秒）
+# LLM_API_RETRIES=6          # 失败重试次数
 
-# 限流（默认 QPM=30，并发=8）
-AZURE_QPM=30
-AZURE_MAX_CONCURRENCY=8
+# ── Session 加密────────────────────────────────────────
+# SECRET_KEY=your-secret     # 固定后重启不需要重新登录；不填则每次随机生成
 ```
 
 ### 3. 启动服务
@@ -84,37 +89,53 @@ AZURE_MAX_CONCURRENCY=8
 ./start.sh
 ```
 
-或手动启动：
+首次访问 `http://localhost:8000`，先创建管理员账号（见下方）。
+
+---
+
+## start.sh 命令参考
+
+| 命令 | 说明 |
+|------|------|
+| `./start.sh` | 启动 Web 服务（生产模式） |
+| `./start.sh --dev` | 启动 Web 服务（开发模式，文件变更自动重载） |
+| `./start.sh --android` | 启动 Expo 开发服务器（App 调试，development 模式） |
+| `./start.sh --android-prod` | 启动 Expo 开发服务器（App 调试，production 模式） |
+| `./start.sh --all` | 同时启动 Web 服务和 Expo 开发服务器 |
+| `./start.sh --stop` | 停止所有已启动的服务 |
+| `./start.sh --status` | 查看服务运行状态 |
+| `./start.sh --create-admin` | 创建管理员账号 |
+| `./start.sh --help` | 显示帮助 |
+
+> **注意**：`--dev` 模式下文件保存会触发服务重启，定时任务可能在重启期间漏触发，生产环境请使用默认模式。
+
+---
+
+## run_webapp.py 参数参考
+
+直接调用时可指定以下参数：
 
 ```bash
-python run_webapp.py --host 0.0.0.0 --port 8000
+python run_webapp.py [--host HOST] [--port PORT] [--reload]
 ```
 
-首次访问 `http://localhost:8000`，注册账号时需要邀请码——第一个账号通过管理员接口创建，见下方。
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--host` | `0.0.0.0` | 监听地址 |
+| `--port` | `8000` | 监听端口 |
+| `--reload` | 关闭 | 开发模式，文件变更自动重载 |
 
-### 4. 创建第一个账号
+---
 
-首次部署需要通过命令行创建管理员账号：
+## 初始化管理员账号
+
+首次部署时创建管理员：
 
 ```bash
 ./start.sh --create-admin
 ```
 
-或直接运行：
-
-```bash
-python -c "
-import sys; sys.path.insert(0, '.')
-from webapp.database import init_db, get_db_sync
-from webapp.models import User
-from webapp.auth import hash_password
-init_db()
-db = get_db_sync()
-u = User(username='admin', password_hash=hash_password('your_password'), is_admin=True, is_active=True)
-db.add(u); db.commit()
-print('管理员账号创建成功')
-"
-```
+按提示输入用户名和密码（密码至少 6 位）。
 
 ---
 
@@ -124,31 +145,38 @@ print('管理员账号创建成功')
 
 - **研究兴趣领域**：如 `Agent, LLM, RL`
 - **高信号关键词**：如 `agent, tool use, reasoning`
-- **定时任务时间**：默认每天 09:30（Asia/Shanghai）
+- **定时任务时间**：默认每天 18:00（Asia/Shanghai）
+- **LLM API Key**：非管理员用户需填写自己的 Key
 
 ---
 
-## Android App 调试
+## Android App
 
 ### 前置条件
 
 - 安装 [Expo Go](https://expo.dev/go)（版本 55）
 - 手机与电脑在同一 WiFi
 
-### 启动开发服务器
+### 启动调试服务器
 
 ```bash
 ./start.sh --android
 ```
 
-扫描终端中的二维码，在 Expo Go 中打开。
+扫描终端中的二维码，在 Expo Go 中打开。App 内 Setup 页面填写服务器地址：
 
-App 内 Setup 页面填写服务器地址：`http://<电脑IP>:8000`
+```
+http://<电脑IP>:8000
+```
 
 查看电脑 IP：
+
 ```bash
-ipconfig getifaddr en0
+ipconfig getifaddr en0       # macOS
+ip route get 1.1.1.1 | awk '{print $7; exit}'  # Linux
 ```
+
+> **注意**：手机访问时请使用局域网 IP，不要用 `localhost`。
 
 ### 构建 APK
 
@@ -160,25 +188,15 @@ eas build --platform android --profile preview
 
 ---
 
-## 服务管理
+## 日志
 
-| 操作 | 命令 |
-|------|------|
-| 启动（生产） | `./start.sh` |
-| 启动（开发，热重载） | `./start.sh --dev` |
-| 启动 Android 调试 | `./start.sh --android` |
-| 查看日志 | `tail -f logs/app.log` |
-| 停止服务 | `./start.sh --stop` |
-
----
-
-## 手动触发抓取
-
-登录后在网页右上角点击「触发」按钮，或通过 API：
+| 日志文件 | 内容 |
+|----------|------|
+| `logs/app.log` | Web 服务日志 |
+| `logs/expo.log` | Expo 开发服务器日志 |
 
 ```bash
-curl -X POST http://localhost:8000/papers/trigger \
-  -H "Cookie: dp_session=<your_session>"
+tail -f logs/app.log
 ```
 
 ---

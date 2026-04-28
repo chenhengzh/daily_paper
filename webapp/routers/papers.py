@@ -345,8 +345,9 @@ async def trigger_job(
         logger = logging.getLogger("trigger")
         try:
             import src.remote_llm_api as llm_mod
-            llm_mod._DEFAULT_SEMAPHORE = asyncio.Semaphore(llm_mod._DEFAULT_CONFIG.MAX_CONCURRENCY)
-            llm_mod._DEFAULT_RATE_LIMITER = llm_mod.AsyncQpmRateLimiter(llm_mod._DEFAULT_CONFIG.QPM)
+            n_keys = max(len(llm_mod._API_KEYS), 1)
+            llm_mod._DEFAULT_SEMAPHORE = asyncio.Semaphore(llm_mod._DEFAULT_CONFIG.MAX_CONCURRENCY * n_keys)
+            llm_mod._DEFAULT_RATE_LIMITER = llm_mod.AsyncQpmRateLimiter(llm_mod._DEFAULT_CONFIG.QPM * n_keys)
             llm_mod._DEFAULT_CLIENT = None
 
             from datetime import date as _date
@@ -404,7 +405,7 @@ async def trigger_job(
                         _push({"type": "done_date", "date": d.isoformat()})
                         processed += 1
                     else:
-                        _push({"type": "skip", "date": d.isoformat()})
+                        _push({"type": "skip", "date": d.isoformat(), "step": step})
                         logger.info(f"[trigger] {d} 无数据，跳过")
                 _push({"type": "all_done", "processed": processed})
 

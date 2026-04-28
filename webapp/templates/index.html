@@ -367,9 +367,7 @@ function renderJobStatus(job) {
   if (!job) { el.innerHTML = '<span class="status-none">无记录</span>'; return; }
   const cls = {pending:'status-pending',scraping:'status-running',rating:'status-running',done:'status-done',failed:'status-failed'}[job.status] || '';
   const label = {pending:'等待中',scraping:'抓取中',rating:'评分中',done:'完成',failed:'失败'}[job.status] || job.status;
-  el.innerHTML = `<span class="status-badge ${cls}">${label}</span>
-    ${job.kept_count != null ? `<span class="status-detail">${job.kept_count}篇</span>` : ''}
-    ${job.error_msg ? `<span class="status-error" title="${escHtml(job.error_msg)}">⚠</span>` : ''}`;
+  el.innerHTML = `<span class="status-badge ${cls}">${label}</span>${job.error_msg ? `<span class="status-error" title="${escHtml(job.error_msg)}">⚠</span>` : ''}`;
 }
 
 function _setTriggerRunning(running) {
@@ -428,10 +426,12 @@ async function _readTriggerProgress() {
             await _refreshDateSelect();
             await loadPapers(TARGET_DATE);
                     } else if (evt.type === 'skip') {
-            _setProgress(`<span class="pulse-dot"></span> 跳过 ${evt.date}（无数据）`, null);
+            const skipPct = (evt.step || 1) / 5 * 100;
+            _setProgress(`<span class="pulse-dot"></span> 跳过 ${evt.date}（无数据）(${evt.step || '?'}/5)`, skipPct);
           } else if (evt.type === 'all_done') {
             _setProgress(`✓ 全部完成，共处理 ${evt.processed} 天`, 100);
             _setTriggerRunning(false);
+            await loadPapers(TARGET_DATE);
             setTimeout(() => { document.getElementById('triggerProgress').style.display = 'none'; }, 2000);
             return;
           } else if (evt.type === 'error') {

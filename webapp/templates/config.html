@@ -186,8 +186,8 @@ async function saveConfig() {
     llm_model: document.getElementById('use_private_api').checked ? (document.getElementById('llm_model').value.trim() || null) : null,
     max_results: parseInt(document.getElementById('max_results').value) || 800,
     auto_trigger: document.getElementById('auto_trigger').checked,
-    trigger_hour: parseInt(document.getElementById('trigger_hour').value) || 9,
-    trigger_minute: parseInt(document.getElementById('trigger_minute').value) || 30,
+    trigger_hour: parseInt(document.getElementById('trigger_hour').value) || 18,
+    trigger_minute: parseInt(document.getElementById('trigger_minute').value) || 0,
   };
   const status = document.getElementById('autoSaveStatus');
   try {
