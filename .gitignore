@@ -1,6 +1,19 @@
 daily_json
 daily_html
 
+# 运行时生成的文件
+*.pid
+.webapp.pid
+.expo.pid
+*.db
+*.sqlite3
+logs/
+
+# 环境变量（保留 example）
+.env
+!.env.example
+".env copy.example"
+
 *.pyc
 
 # Byte-compiled / optimized / DLL files
