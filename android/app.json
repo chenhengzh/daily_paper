@@ -20,7 +20,8 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "permissions": ["android.permission.INTERNET"]
+      "permissions": ["android.permission.INTERNET"],
+      "usesCleartextTraffic": true
     }
   }
 }
