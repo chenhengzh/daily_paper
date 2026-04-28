@@ -26,6 +26,7 @@
           <th>用户类型</th>
           <th>管理员</th>
           <th>已激活</th>
+          <th></th>
         </tr>
       </thead>
       <tbody id="usersBody"></tbody>
@@ -119,6 +120,10 @@ async function loadUsers() {
               onchange="updateUser(${u.id}, 'is_active', this.checked, this)">
             <span class="toggle-track"></span>
           </label>
+        </td>
+        <td>
+          <button class="btn btn-sm" style="font-size:11px" title="以该用户身份进入"
+            onclick="impersonate(${u.id}, '${esc(u.username)}')">进入</button>
         </td>
       </tr>`).join('');
   } catch(e) {
@@ -237,6 +242,32 @@ async function deleteCode(code) {
 
 function copyCode(code) {
   navigator.clipboard.writeText(code).then(() => showMsg('已复制', 'success'));
+}
+
+// ── Impersonate ──────────────────────────────────────────────────────────────
+
+async function impersonate(userId, username) {
+  if (!confirm(`以 ${username} 的身份进入？`)) return;
+  try {
+    const res = await fetch(`/admin/impersonate/${userId}`, {method: 'POST'});
+    if (res.ok) {
+      window.location.href = '/';
+    } else {
+      const d = await res.json();
+      showMsg(d.detail || '操作失败', 'error');
+    }
+  } catch(e) { showMsg('请求失败: ' + e.message, 'error'); }
+}
+
+async function exitImpersonate() {
+  try {
+    const res = await fetch('/admin/impersonate-exit', {method: 'POST'});
+    if (res.ok) window.location.href = '/admin/';
+    else {
+      const d = await res.json();
+      showMsg(d.detail || '退出失败', 'error');
+    }
+  } catch(e) { showMsg('请求失败: ' + e.message, 'error'); }
 }
 
 // 初始化

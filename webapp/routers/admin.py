@@ -138,3 +138,33 @@ async def delete_invite_code(code: str, request: Request, db: Session = Depends(
     db.delete(invite)
     db.commit()
     return {"ok": True}
+
+
+@router.post("/impersonate/{user_id}", response_class=JSONResponse)
+async def impersonate_user(user_id: int, request: Request, db: Session = Depends(get_db)):
+    admin = _require_admin(request, db)
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if not target.is_active:
+        raise HTTPException(status_code=400, detail="该用户已被禁用")
+    request.session["impersonator_id"] = admin.id
+    request.session["user_id"] = target.id
+    return {"ok": True}
+
+
+@router.post("/impersonate-exit")
+async def impersonate_exit(request: Request, db: Session = Depends(get_db)):
+    admin_id = request.session.get("impersonator_id")
+    if not admin_id:
+        raise HTTPException(status_code=400, detail="当前不在代入模式")
+    admin = db.query(User).filter(User.id == admin_id).first()
+    if not admin or not admin.is_admin:
+        raise HTTPException(status_code=403, detail="原管理员账号无效")
+    request.session["user_id"] = admin_id
+    del request.session["impersonator_id"]
+    # support both fetch (JSON) and form POST (redirect)
+    accept = request.headers.get("accept", "")
+    if "application/json" in accept:
+        return JSONResponse({"ok": True})
+    return RedirectResponse("/admin/", status_code=303)

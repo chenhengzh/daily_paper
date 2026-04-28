@@ -36,6 +36,15 @@
   </nav>
   {% endblock %}
 
+  {% if request.session.get('impersonator_id') %}
+  <div style="background:var(--accent);color:#fff;text-align:center;padding:6px 16px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:12px">
+    <span>代入模式：当前以 <strong>{{ user.username }}</strong> 身份浏览</span>
+    <form action="/admin/impersonate-exit" method="post" style="display:inline">
+      <button type="submit" style="background:#fff;color:var(--accent);border:none;border-radius:4px;padding:2px 10px;cursor:pointer;font-size:12px">退出代入 →</button>
+    </form>
+  </div>
+  {% endif %}
+
   <main>
     {% block content %}{% endblock %}
   </main>
