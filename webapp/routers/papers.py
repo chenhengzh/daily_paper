@@ -405,7 +405,7 @@ async def trigger_job(
                         _push({"type": "done_date", "date": d.isoformat()})
                         processed += 1
                     else:
-                        _push({"type": "skip", "date": d.isoformat(), "step": step})
+                        _push({"type": "skip", "date": d.isoformat(), "step": i + 1})
                         logger.info(f"[trigger] {d} 无数据，跳过")
                 _push({"type": "all_done", "processed": processed})
 
