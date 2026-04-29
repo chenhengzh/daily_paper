@@ -17,11 +17,19 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#0C133B"
       },
       "edgeToEdgeEnabled": true,
-      "permissions": ["android.permission.INTERNET"],
+      "permissions": [
+        "android.permission.INTERNET"
+      ],
       "usesCleartextTraffic": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b80bc791-417b-4195-8ce2-ca8d75064c19"
+      }
+    },
+    "owner": "chenhengz"
   }
 }

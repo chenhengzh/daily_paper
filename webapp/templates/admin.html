@@ -175,8 +175,7 @@ function renderCodes(codes) {
   tbody.innerHTML = codes.map(c => `
     <tr>
       <td>
-        <code class="invite-code">${esc(c.code)}</code>
-        <button class="btn-icon" onclick="copyCode('${esc(c.code)}')" title="复制">⎘</button>
+        <code class="invite-code" onclick="copyCode('${esc(c.code)}')" title="点击复制" style="cursor:pointer">${esc(c.code)}</code>
       </td>
       <td><span class="badge badge-${c.code_type==='internal'?'info':''}">${c.code_type==='internal'?'内部':'外部'}</span></td>
       <td>${fmtDate(c.created_at)}</td>
