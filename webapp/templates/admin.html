@@ -240,7 +240,19 @@ async function deleteCode(code) {
 }
 
 function copyCode(code) {
-  navigator.clipboard.writeText(code).then(() => showMsg('已复制', 'success'));
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code).then(() => showMsg('已复制', 'success'));
+  } else {
+    const el = document.createElement('textarea');
+    el.value = code;
+    el.style.position = 'fixed';
+    el.style.opacity = '0';
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    showMsg('已复制', 'success');
+  }
 }
 
 // ── Impersonate ──────────────────────────────────────────────────────────────
