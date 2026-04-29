@@ -30,6 +30,16 @@
         "projectId": "b80bc791-417b-4195-8ce2-ca8d75064c19"
       }
     },
-    "owner": "chenhengz"
+    "owner": "chenhengz",
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ]
   }
 }
