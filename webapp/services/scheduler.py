@@ -40,7 +40,11 @@ def _run_user_pipeline(user_id: int, username: str, today, keywords, categories,
 async def _check_and_trigger():
     """每分钟检查，对到达触发时间且开启定时的用户，在独立线程中启动 pipeline。"""
     now = datetime.now().astimezone()
-    today = now.date()
+    # 18点为分界线：18点前最新可用日期为前天，18点及之后为昨天
+    if now.hour < 18:
+        today = now.date() - timedelta(days=2)
+    else:
+        today = now.date() - timedelta(days=1)
 
     db = SessionLocal()
     try:

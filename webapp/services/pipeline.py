@@ -118,10 +118,6 @@ async def rate_papers_for_user(
             db.commit()
             db.refresh(job)
 
-        if job.status == "done" and not force:
-            logger.info(f"[pipeline] user={user.username} date={target_date} 已完成，跳过")
-            return
-
         job.status = "rating"
         job.started_at = datetime.utcnow()
         job.error_msg = None
@@ -139,9 +135,29 @@ async def rate_papers_for_user(
         job.scrape_count = len(papers_orm)
         db.commit()
 
+        # 过滤掉已有评分的论文，只对新论文补充评分
+        all_paper_ids = [p.id for p in papers_orm]
+        rated_paper_ids = {
+            row[0] for row in db.query(UserPaperResult.paper_id)
+            .filter(
+                UserPaperResult.user_id == user_id,
+                UserPaperResult.paper_id.in_(all_paper_ids),
+            )
+            .all()
+        }
+        new_papers_orm = [p for p in papers_orm if p.id not in rated_paper_ids]
+        logger.info(f"[pipeline] user={user.username} date={target_date} 总论文={len(papers_orm)}，已评分={len(rated_paper_ids)}，新增={len(new_papers_orm)}")
+
+        if not new_papers_orm:
+            logger.info(f"[pipeline] user={user.username} date={target_date} 无新论文，跳过评分")
+            job.status = "done"
+            job.finished_at = datetime.utcnow()
+            db.commit()
+            return
+
         # 将 ORM 对象转为 dict（供 filter.py 使用）
         papers_dict = []
-        for p in papers_orm:
+        for p in new_papers_orm:
             papers_dict.append({
                 "arxiv_id": p.arxiv_id,
                 "title": p.title,
@@ -300,42 +316,63 @@ async def rate_papers_for_user(
                 llm_mod._DEFAULT_CLIENT = None
                 llm_mod._KEY_CLIENTS = []
 
-        # 全部完成后做 high_priority 标记并更新
-        rated = mark_high_priority(rated)
+        # 全部完成后，合并旧的已评分结果，重新做 high_priority 排名
+        # 读取该日期该用户所有已有结果（含刚写入的新论文）
+        existing_results = (
+            db.query(UserPaperResult, Paper)
+            .join(Paper, UserPaperResult.paper_id == Paper.id)
+            .filter(
+                UserPaperResult.user_id == user_id,
+                Paper.paper_date == target_date,
+            )
+            .all()
+        )
+        all_rated = []
+        existing_paper_id_map = {}  # arxiv_id -> paper_id，覆盖全部已存结果
+        for upr, p in existing_results:
+            existing_paper_id_map[p.arxiv_id] = p.id
+            all_rated.append({
+                "arxiv_id": p.arxiv_id,
+                "keep": upr.keep,
+                "overall_priority_score": upr.overall_priority_score,
+                "relevance_score": upr.relevance_score,
+                "quality_score": upr.quality_score,
+                "tier": upr.tier or "C",
+                "high_priority": upr.high_priority,
+                "high_priority_rank": upr.high_priority_rank,
+            })
+
+        all_rated = mark_high_priority(all_rated)
+
         kept_count = 0
         hp_count = 0
-        for r in rated:
+        for r in all_rated:
             if r.get("keep", True):
                 kept_count += 1
             if r.get("high_priority"):
                 hp_count += 1
-            # 更新 high_priority 相关字段
             arxiv_id = r.get("arxiv_id") or ""
-            paper_id = paper_id_map.get(arxiv_id)
+            paper_id = existing_paper_id_map.get(arxiv_id)
             if paper_id:
                 db.execute(
                     sqlite_insert(UserPaperResult).values(
                         user_id=user_id, paper_id=paper_id, job_id=job.id,
                         keep=bool(r.get("keep", True)),
-                        keep_reason=r.get("keep_reason") or "",
-                        interest_field=r.get("interest_field") or "",
-                        interest_subfield=r.get("interest_subfield") or "",
-                        interest_match_reason=r.get("interest_match_reason") or "",
-                        tldr=r.get("tldr") or "", tldr_zh=r.get("tldr_zh") or "",
-                        summary_zh=r.get("summary_zh") or "",
-                        tags_json=json.dumps(r.get("tags") or [], ensure_ascii=False),
+                        keep_reason="", interest_field="", interest_subfield="",
+                        interest_match_reason="", tldr="", tldr_zh="", summary_zh="",
+                        tags_json="[]",
                         relevance_score=r.get("relevance_score"),
                         quality_score=r.get("quality_score"),
-                        novelty_claim_score=r.get("novelty_claim_score"),
-                        potential_impact_score=r.get("impact_score"),
+                        novelty_claim_score=None,
+                        potential_impact_score=None,
                         overall_priority_score=r.get("overall_priority_score"),
                         tier=r.get("tier") or "C",
                         high_priority=bool(r.get("high_priority", False)),
                         high_priority_rank=r.get("high_priority_rank"),
-                        signal_high_keywords_json=json.dumps(r.get("signal_high_keywords") or [], ensure_ascii=False),
-                        signal_notable_authors_json=json.dumps(r.get("signal_notable_authors") or [], ensure_ascii=False),
-                        signal_low_keywords_json=json.dumps(r.get("signal_low_keywords") or [], ensure_ascii=False),
-                        signal_evidence_keywords_json=json.dumps(r.get("signal_evidence_keywords") or [], ensure_ascii=False),
+                        signal_high_keywords_json="[]",
+                        signal_notable_authors_json="[]",
+                        signal_low_keywords_json="[]",
+                        signal_evidence_keywords_json="[]",
                     ).on_conflict_do_update(
                         index_elements=["user_id", "paper_id"],
                         set_={

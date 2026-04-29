@@ -360,7 +360,12 @@ async def trigger_job(
                 _max_results = _cfg.max_results if _cfg else 800
             finally:
                 _db2.close()
-            today = _date.today()
+            now = datetime.now()
+            # 18点为分界线：18点前最新可用日期为前天，18点及之后为昨天
+            if now.hour < 18:
+                today = now.date() - timedelta(days=2)
+            else:
+                today = now.date() - timedelta(days=1)
 
             async def _run_all():
                 processed = 0
