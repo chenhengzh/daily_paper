@@ -53,7 +53,7 @@ async def _check_and_trigger():
             if user.username == "admin":
                 continue
             cfg = db.query(UserConfig).filter(UserConfig.user_id == user.id).first()
-            auto_trigger = cfg.auto_trigger if cfg and cfg.auto_trigger is not None else True
+            auto_trigger = cfg.auto_trigger if cfg and cfg.auto_trigger is not None else False
             trigger_hour = cfg.trigger_hour if cfg and cfg.trigger_hour is not None else 18
             trigger_minute = cfg.trigger_minute if cfg and cfg.trigger_minute is not None else 0
 

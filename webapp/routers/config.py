@@ -135,7 +135,7 @@ def _serialize_config(cfg: UserConfig | None) -> dict:
             "llm_model": "",
             "max_results": 800,
             "high_priority_target": 15,
-            "auto_trigger": True,
+            "auto_trigger": False,
             "trigger_hour": 18,
             "trigger_minute": 0,
         }
@@ -151,7 +151,7 @@ def _serialize_config(cfg: UserConfig | None) -> dict:
         "llm_model": cfg.llm_model or "",
         "max_results": cfg.max_results,
         "high_priority_target": cfg.high_priority_target,
-        "auto_trigger": cfg.auto_trigger if cfg.auto_trigger is not None else True,
+        "auto_trigger": cfg.auto_trigger if cfg.auto_trigger is not None else False,
         "trigger_hour": cfg.trigger_hour if cfg.trigger_hour is not None else 18,
         "trigger_minute": cfg.trigger_minute if cfg.trigger_minute is not None else 0,
     }
