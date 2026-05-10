@@ -3,8 +3,6 @@
 **每天自动抓取 arXiv 新论文，根据你的研究兴趣用 LLM 评分筛选，网页和手机随时浏览。** 告别信息过载，只看值得读的论文。
 
 <p align="center">
-  <img src="figure/personal_config.png" alt="个性化配置" height="300"/>
-  &nbsp;&nbsp;&nbsp;&nbsp;
   <img src="figure/web_main.png" alt="Web 主界面" height="300"/>
   &nbsp;&nbsp;&nbsp;&nbsp;
   <img src="figure/app.jpg" alt="Android App" height="300"/>
@@ -17,6 +15,19 @@
 - **每日自动抓取**：定时爬取 arXiv，也可手动触发
 - **多端同步**：网页端 + Android App，收藏随时同步
 - **高优先级标记**：自动标出最值得关注的论文
+
+## 个性化配置
+
+登录后进入「配置」页面，可以设置以下内容：
+
+| 配置项 | 说明 | 示例 |
+|--------|------|------|
+| 研究兴趣领域 | 按领域过滤论文，只保留相关方向 | `Agent, LLM, RL` |
+| 高信号关键词 | 含有这些词的论文会被额外关注 | `agent, tool use, reasoning` |
+| 低信号关键词 | 含有这些词的论文会被降权 | `survey, benchmark` |
+| 定时抓取时间 | 每天自动运行的时间（Asia/Shanghai） | `18:00`（默认） |
+| LLM API Key | 非管理员用户填写自己的 Key，独立计费 | `sk-...` |
+| 自动触发 | 是否在每日定时任务中自动抓取 | 默认关闭 |
 
 ---
 
@@ -93,17 +104,6 @@ LLM_MAX_CONCURRENCY=16       # 单个 Key 最大并发数
 | `./start.sh --help` | 显示帮助 |
 
 > `--dev` 模式下文件保存会触发服务重启，定时任务可能在重启期间漏触发，生产环境请使用默认模式。
-
----
-
-## 配置研究兴趣
-
-登录后进入「配置」页面，设置：
-
-- **研究兴趣领域**：如 `Agent, LLM, RL`
-- **高信号关键词**：如 `agent, tool use, reasoning`
-- **定时任务时间**：默认每天 18:00（Asia/Shanghai）
-- **LLM API Key**：非管理员用户需填写自己的 Key
 
 ---
 
