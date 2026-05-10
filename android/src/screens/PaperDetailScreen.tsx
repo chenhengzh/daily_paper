@@ -6,11 +6,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Linking from 'expo-linking';
+import { useQueryClient } from '@tanstack/react-query';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { TagChip } from '../components/TagChip';
 import { ScoreBar } from '../components/ScoreBar';
 import { useTheme } from '../hooks/useTheme';
 import { bookmarkPaper, unbookmarkPaper } from '../api/papers';
+import { PapersResponse } from '../types/paper';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -38,6 +40,7 @@ const divStyles = StyleSheet.create({
 
 export function PaperDetailScreen({ route, navigation }: Props) {
   const { colors } = useTheme();
+  const queryClient = useQueryClient();
   const { paper } = route.params;
   const [abstractExpanded, setAbstractExpanded] = useState(false);
   const [bookmarked, setBookmarked] = useState(paper.is_bookmarked ?? false);
@@ -51,8 +54,22 @@ export function PaperDetailScreen({ route, navigation }: Props) {
       } else {
         await unbookmarkPaper(paper.arxiv_id);
       }
+      // Sync bookmark state back into the react-query papers cache so the list
+      // reflects the change without needing a full refetch.
+      queryClient.setQueriesData<PapersResponse>(
+        { queryKey: ['papers'], exact: false },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            papers: old.papers.map((p) =>
+              p.arxiv_id === paper.arxiv_id ? { ...p, is_bookmarked: next } : p
+            ),
+          };
+        }
+      );
     } catch {
-      setBookmarked(!next); // revert on failure
+      setBookmarked(!next);
     }
   };
 
