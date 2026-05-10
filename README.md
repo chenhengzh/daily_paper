@@ -27,7 +27,7 @@
 | 低信号关键词 | 含有这些词的论文会被降权 | `survey, benchmark` |
 | 关注作者 | 来自这些作者的论文会被额外关注并在结果中标注 | `Yann LeCun, Andrej Karpathy` |
 | 定时抓取时间 | 每天自动运行的时间（Asia/Shanghai） | `18:00`（默认） |
-| LLM API Key | 非管理员用户填写自己的 Key，独立计费 | `sk-...` |
+| LLM API Key | 非内部用户填写自己的 Key，独立计费 | `sk-...` |
 
 
 ---
