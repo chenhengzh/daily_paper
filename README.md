@@ -3,6 +3,8 @@
 **每天自动抓取 arXiv 新论文，根据你的研究兴趣用 LLM 评分筛选，网页和手机随时浏览。** 告别信息过载，只看值得读的论文。
 
 <p align="center">
+  <img src="figure/personal_config.png" alt="个性化配置" height="300"/>
+  &nbsp;&nbsp;&nbsp;&nbsp;
   <img src="figure/web_main.png" alt="Web 主界面" height="300"/>
   &nbsp;&nbsp;&nbsp;&nbsp;
   <img src="figure/app.jpg" alt="Android App" height="300"/>
