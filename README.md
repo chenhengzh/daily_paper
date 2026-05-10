@@ -1,38 +1,24 @@
 # Daily Paper
 
-每日 arXiv 论文智能筛选系统。自动抓取论文、用 LLM 评分过滤，通过网页和 Android App 浏览。
+> 每天自动抓取 arXiv 新论文，用 LLM 评分筛选，通过网页和 Android App 随时浏览。告别信息过载，只看值得读的论文。
 
-## 功能
+<p align="center">
+  <img src="figure/web_main.png" alt="Web 主界面" width="700"/>
+</p>
 
-- 每日定时抓取 arXiv 新论文，按研究兴趣过滤
-- LLM 自动评分（相关性、质量、新颖性、影响力）并生成中文摘要
-- 网页端：论文列表、收藏夹、管理后台
-- Android App（Expo）：手机浏览、收藏同步
+<p align="center">
+  <img src="figure/app.jpg" alt="Android App" width="300"/>
+  &nbsp;&nbsp;&nbsp;
+  <img src="figure/personal_config.png" alt="个性化配置" width="300"/>
+</p>
 
----
+## 功能亮点
 
-## 目录结构
-
-```
-daily_paper/
-├── run_webapp.py          # 服务启动入口
-├── start.sh               # 一键启动脚本
-├── requirements.txt
-├── .env                   # 环境变量（需自行创建，见下方）
-├── src/                   # 抓取 & 评分核心逻辑
-│   ├── scraper.py
-│   ├── filter.py
-│   └── remote_llm_api.py
-├── webapp/                # FastAPI 后端
-│   ├── main.py
-│   ├── models.py
-│   ├── database.py
-│   ├── routers/
-│   └── services/
-├── static/                # CSS
-├── android/               # React Native (Expo) App
-└── logs/                  # 运行日志
-```
+- **自动抓取**：每日定时爬取 arXiv 新论文，支持手动触发
+- **LLM 智能评分**：相关性、质量、新颖性、影响力四维度打分，生成中文摘要
+- **个性化过滤**：按研究兴趣领域、关键词精准筛选
+- **多端浏览**：网页端 + Android App，支持收藏同步
+- **高优先级标记**：自动标出最值得关注的论文
 
 ---
 
@@ -50,7 +36,7 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# 编辑 .env，填写必填项
+# 用编辑器打开 .env，填写以下内容
 ```
 
 **`.env` 完整说明：**
@@ -63,8 +49,7 @@ OPENAI_BASE_URL=https://api.openai.com/v1  # OpenAI-compatible 网关地址
 # 单个 Key
 OPENAI_API_KEY=sk-...
 
-# 多个 Key（逗号分隔）；配置后 OPENAI_API_KEY 可省略
-# 总并发 = LLM_MAX_CONCURRENCY × key 数量
+# 多个 Key（逗号分隔，总并发 = LLM_MAX_CONCURRENCY × key 数量）
 # OPENAI_API_KEYS=sk-key1,sk-key2,sk-key3
 
 # ── Azure 模式（OPENAI_API_TYPE=azure 时填写）───────────
@@ -74,13 +59,11 @@ OPENAI_API_KEY=sk-...
 
 # ── 模型与限流──────────────────────────────────────────
 LLM_MODEL_NAME=gpt-4o        # 模型名称
-LLM_QPM=20                   # 单个 Key 每分钟请求上限（多 Key 时自动 × key 数量）
+LLM_QPM=20                   # 单个 Key 每分钟请求上限
 LLM_MAX_CONCURRENCY=16       # 单个 Key 最大并发数
-# LLM_TIMEOUT_S=120          # 单次请求超时（秒）
-# LLM_API_RETRIES=6          # 失败重试次数
 
 # ── Session 加密────────────────────────────────────────
-# SECRET_KEY=your-secret     # 固定后重启不需要重新登录；不填则每次随机生成
+# SECRET_KEY=your-secret     # 固定后重启不需要重新登录
 ```
 
 ### 3. 启动服务
@@ -89,7 +72,11 @@ LLM_MAX_CONCURRENCY=16       # 单个 Key 最大并发数
 ./start.sh
 ```
 
-首次访问 `http://localhost:8000`，先创建管理员账号（见下方）。
+首次访问 `http://localhost:8000`，运行以下命令创建管理员账号：
+
+```bash
+./start.sh --create-admin
+```
 
 ---
 
@@ -107,35 +94,7 @@ LLM_MAX_CONCURRENCY=16       # 单个 Key 最大并发数
 | `./start.sh --create-admin` | 创建管理员账号 |
 | `./start.sh --help` | 显示帮助 |
 
-> **注意**：`--dev` 模式下文件保存会触发服务重启，定时任务可能在重启期间漏触发，生产环境请使用默认模式。
-
----
-
-## run_webapp.py 参数参考
-
-直接调用时可指定以下参数：
-
-```bash
-python run_webapp.py [--host HOST] [--port PORT] [--reload]
-```
-
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `--host` | `0.0.0.0` | 监听地址 |
-| `--port` | `8000` | 监听端口 |
-| `--reload` | 关闭 | 开发模式，文件变更自动重载 |
-
----
-
-## 初始化管理员账号
-
-首次部署时创建管理员：
-
-```bash
-./start.sh --create-admin
-```
-
-按提示输入用户名和密码（密码至少 6 位）。
+> `--dev` 模式下文件保存会触发服务重启，定时任务可能在重启期间漏触发，生产环境请使用默认模式。
 
 ---
 
@@ -172,11 +131,11 @@ http://<电脑IP>:8000
 查看电脑 IP：
 
 ```bash
-ipconfig getifaddr en0       # macOS
+ifconfig | grep "inet " | grep -v 127.0.0.1   # macOS
 ip route get 1.1.1.1 | awk '{print $7; exit}'  # Linux
 ```
 
-> **注意**：手机访问时请使用局域网 IP，不要用 `localhost`。
+> 手机访问时请使用局域网 IP，不要用 `localhost`。
 
 ### 构建 APK
 
