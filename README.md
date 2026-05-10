@@ -1,23 +1,23 @@
 # Daily Paper
 
-> 每天自动抓取 arXiv 新论文，用 LLM 评分筛选，通过网页和 Android App 随时浏览。告别信息过载，只看值得读的论文。
+**每天自动抓取 arXiv 新论文，根据你的研究兴趣用 LLM 评分筛选，网页和手机随时浏览。** 告别信息过载，只看值得读的论文。
 
 <p align="center">
-  <img src="figure/web_main.png" alt="Web 主界面" width="700"/>
+  <img src="figure/web_main.png" alt="Web 主界面" width="600"/>
 </p>
 
 <p align="center">
-  <img src="figure/app.jpg" alt="Android App" width="300"/>
-  &nbsp;&nbsp;&nbsp;
-  <img src="figure/personal_config.png" alt="个性化配置" width="300"/>
+  <img src="figure/app.jpg" alt="Android App" width="200"/>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="figure/personal_config.png" alt="个性化配置" width="200"/>
 </p>
 
 ## 功能亮点
 
-- **自动抓取**：每日定时爬取 arXiv 新论文，支持手动触发
-- **LLM 智能评分**：相关性、质量、新颖性、影响力四维度打分，生成中文摘要
-- **个性化过滤**：按研究兴趣领域、关键词精准筛选
-- **多端浏览**：网页端 + Android App，支持收藏同步
+- **个性化筛选**：设定研究方向和关键词，只推送你真正关心的论文
+- **LLM 智能评分**：相关性、质量、新颖性、影响力四维度打分，附中文摘要
+- **每日自动抓取**：定时爬取 arXiv，也可手动触发
+- **多端同步**：网页端 + Android App，收藏随时同步
 - **高优先级标记**：自动标出最值得关注的论文
 
 ---
