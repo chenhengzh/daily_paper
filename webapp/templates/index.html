@@ -240,8 +240,8 @@ function paperCard(p) {
     <div class="card-footer">
       <div class="card-tags">${tags}</div>
       <div class="card-links">
-        <a href="https://alphaxiv.org/abs/${escHtml(p.arxiv_id || '')}" target="_blank" onclick="event.stopPropagation()">alphaXiv</a>
-        ${p.pdf_url ? `<a href="${escHtml(p.pdf_url)}" target="_blank" onclick="event.stopPropagation()">PDF</a>` : ''}
+        <a href="https://alphaxiv.org/abs/${escHtml(p.arxiv_id || '')}" target="_blank" onclick="event.stopPropagation()">alphaXiv ↗</a>
+        ${p.pdf_url ? `<a href="${escHtml(p.pdf_url)}" target="_blank" onclick="event.stopPropagation()">PDF ↗</a>` : ''}
         <button class="bookmark-btn${p.is_bookmarked ? ' bookmarked' : ''}" data-id="${escHtml(p.arxiv_id || '')}" onclick="event.stopPropagation();toggleBookmark(this,'${escHtml(p.arxiv_id || '')}')" title="${p.is_bookmarked ? '取消收藏' : '收藏'}">${p.is_bookmarked ? '★' : '☆'}</button>
       </div>
     </div>

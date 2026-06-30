@@ -143,6 +143,7 @@ class UserPaperResult(Base):
     signal_evidence_keywords_json: Mapped[str] = mapped_column(Text, default="[]")
 
     is_bookmarked: Mapped[bool] = mapped_column(Boolean, default=False)
+    bookmarked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

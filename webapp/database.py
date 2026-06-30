@@ -46,6 +46,7 @@ def init_db():
             "ALTER TABLE daily_jobs ADD COLUMN input_tokens INTEGER",
             "ALTER TABLE daily_jobs ADD COLUMN output_tokens INTEGER",
             "ALTER TABLE user_paper_results ADD COLUMN is_bookmarked BOOLEAN NOT NULL DEFAULT 0",
+            "ALTER TABLE user_paper_results ADD COLUMN bookmarked_at DATETIME",
         ]:
             try:
                 conn.execute(__import__("sqlalchemy").text(col_def))

@@ -191,6 +191,7 @@ async def bookmark_paper(arxiv_id: str, request: Request, db: Session = Depends(
     ).first()
     if result:
         result.is_bookmarked = True
+        result.bookmarked_at = datetime.utcnow()
         db.commit()
     return {"arxiv_id": arxiv_id, "is_bookmarked": True}
 
@@ -206,6 +207,7 @@ async def unbookmark_paper(arxiv_id: str, request: Request, db: Session = Depend
     ).first()
     if result:
         result.is_bookmarked = False
+        result.bookmarked_at = None
         db.commit()
     return {"arxiv_id": arxiv_id, "is_bookmarked": False}
 
@@ -231,7 +233,7 @@ async def get_bookmarks_full(request: Request, db: Session = Depends(get_db)):
         db.query(UserPaperResult, Paper)
         .join(Paper, UserPaperResult.paper_id == Paper.id)
         .filter(UserPaperResult.user_id == user.id, UserPaperResult.is_bookmarked == True)
-        .order_by(UserPaperResult.overall_priority_score.desc())
+        .order_by(UserPaperResult.bookmarked_at.desc())
         .all()
     )
     papers = []
